@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nomad | Reporte ejecutivo autónomo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#eef3f8;
+      --card:#ffffff;
+      --line:#d9e3ef;
+      --ink:#0f2747;
+      --muted:#637792;
+      --blue:#174a97;
+      --blue-soft:#dbe8ff;
+      --green:#21a35a;
+      --green-soft:#def7e8;
+      --amber:#f2b529;
+      --amber-soft:#fff0c7;
+      --red:#d34141;
+      --red-soft:#fee2e2;
+      --violet:#7656d7;
+      --shadow:0 14px 40px rgba(23,74,151,.08);
+      --radius:22px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      background:linear-gradient(180deg,#eff4f9 0%, #e7eef6 100%);
+      color:var(--ink);
+    }
+    .wrap{max-width:1540px;margin:0 auto;padding:22px}
+    .topbar,.panel,.card,.group,.tableWrap,.modalCard{background:rgba(255,255,255,.88);backdrop-filter: blur(10px);border:1px solid rgba(217,227,239,.95);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .topbar{padding:24px;display:grid;grid-template-columns:1.25fr .95fr;gap:18px;align-items:start}
+    .brand{display:flex;gap:18px;align-items:flex-start}
+    .brand img{width:92px;height:92px;object-fit:contain;border-radius:22px;padding:12px;background:#fff;border:1px solid var(--line)}
+    h1{font-size:46px;line-height:1.03;margin:4px 0 10px;font-weight:800;letter-spacing:-.03em}
+    .sub{font-size:20px;line-height:1.45;color:var(--muted);max-width:900px}
+    .pills,.statusRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    .pill{padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:#fff;color:#4b6283;font-weight:700;font-size:14px}
+    .ok{background:var(--green-soft);border-color:#b6eacb;color:#177a40}
+    .warn{background:#fff6dc;border-color:#f3dd96;color:#8a6513}
+    .soft{background:#f7fbff}
+    .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-self:center}
+    button,.btn,select,input,textarea{font:inherit}
+    .btn{border:none;border-radius:18px;padding:15px 18px;font-weight:800;cursor:pointer;transition:.2s ease;display:inline-flex;justify-content:center;align-items:center;gap:10px;text-decoration:none}
+    .btn:hover{transform:translateY(-1px)}
+    .btn.blue{background:#1e4f9b;color:#fff}
+    .btn.green{background:#20b25f;color:#fff}
+    .btn.white{background:#fff;color:#133d79;border:1px solid var(--line)}
+    .btn.ghost{background:#f6f9fd;color:#133d79;border:1px solid var(--line)}
+    .controls{margin-top:20px;padding:18px;display:grid;grid-template-columns:1.4fr repeat(4,.9fr) auto auto;gap:12px;align-items:end}
+    .field{display:flex;flex-direction:column;gap:8px}
+    .field label{font-weight:700;color:#526a8c;font-size:14px}
+    .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:16px;padding:14px 16px;outline:none;color:var(--ink)}
+    .hint{grid-column:1/-1;border:1px dashed #c2d4ea;background:#f8fbff;padding:14px 18px;border-radius:18px;color:#5f7698}
+    .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:20px}
+    .card{padding:22px;min-height:162px}
+    .card.clickable{cursor:pointer;transition:.18s ease}
+    .card.clickable:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(23,74,151,.12)}
+    .kicker{color:#5f7698;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+    .big{font-size:54px;font-weight:800;line-height:1;margin:8px 0 10px;color:#0c4088;letter-spacing:-.04em}
+    .meta{color:#667d9b;font-size:14px;line-height:1.5}
+    .tone-green{background:linear-gradient(180deg,#f6fffa, #effaf4)}
+    .tone-blue{background:linear-gradient(180deg,#f7fbff, #edf4ff)}
+    .tone-amber{background:linear-gradient(180deg,#fffdfa, #fff7e5)}
+    .tone-red{background:linear-gradient(180deg,#fffaf9, #fff0ef)}
+    .tone-violet{background:linear-gradient(180deg,#fcfbff, #f3f0ff)}
+    .mainGrid{display:grid;grid-template-columns:1.2fr 1fr;gap:18px;margin-top:18px}
+    .panel{padding:22px}
+    .panel h2{margin:0 0 6px;font-size:24px;letter-spacing:-.02em}
+    .panel p{margin:0 0 16px;color:var(--muted)}
+    .chartBox{position:relative;width:100%;height:560px;min-height:560px}
+    .chartBox.donut{height:500px;min-height:500px}
+    .chartBox.pipeline{height:380px;min-height:380px}
+    canvas{width:100% !important;height:100% !important}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+    .summaryTable,.boardTable{width:100%;border-collapse:collapse}
+    .summaryTable th,.summaryTable td,.boardTable th,.boardTable td{padding:12px 10px;border-bottom:1px solid #e9eff6;text-align:left;font-size:14px;vertical-align:top}
+    .summaryTable th,.boardTable th{color:#587091;font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+    .tableWrap{padding:18px;margin-top:18px;overflow:auto}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;font-weight:800;font-size:12px;border:1px solid transparent;white-space:nowrap}
+    .chip.red{background:#d62c2c;color:#fff}
+    .chip.orange{background:#f87a00;color:#fff}
+    .chip.yellow{background:#f7c338;color:#312300}
+    .chip.blue{background:#3d5fc4;color:#fff}
+    .chip.green{background:#37c56b;color:#073a20}
+    .chip.gray{background:#edf2f7;color:#445b78;border-color:#d7e1ed}
+    .providerTag{padding:9px 14px;border:1px solid #ccd8e6;border-radius:14px;background:#fff;font-weight:700;display:inline-flex;min-width:110px;justify-content:center}
+    .payCell,.testCell{display:inline-flex;min-width:160px;justify-content:center}
+    .groupSection{margin-top:16px}
+    .groupHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+    .groupHead h3{margin:0;font-size:16px}
+    .countBadge{padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-weight:800;color:#536b8d;background:#fff}
+    .empty{padding:28px;border:1px dashed #c3d2e5;border-radius:18px;color:#637792;background:#fbfdff;text-align:center}
+    .mono{font-variant-numeric: tabular-nums}
+    .tiny{font-size:12px;color:#7287a4}
+    .rowActions{display:flex;gap:8px;flex-wrap:wrap}
+    .mini{padding:9px 12px;border-radius:12px;font-size:12px;font-weight:800}
+    .footerNote{margin-top:14px;color:#607796;font-size:13px}
+    .modal{position:fixed;inset:0;background:rgba(8,17,31,.42);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+    .modal.open{display:flex}
+    .modalCard{width:min(1080px,100%);padding:22px;max-height:88vh;overflow:auto}
+    .modalCard h3{margin:0 0 14px;font-size:24px}
+    .modalGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .modalGrid .field.full{grid-column:1/-1}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .legend .chip{font-size:11px;padding:7px 10px}
+    .financeTableWrap{margin-top:14px;border:1px solid var(--line);border-radius:18px;overflow:auto}
+    .financeRecordTable{width:100%;border-collapse:collapse;background:#fff}
+    .financeRecordTable th,.financeRecordTable td{padding:12px 10px;border-bottom:1px solid #e9eff6;text-align:left;font-size:14px;vertical-align:top}
+    .financeRecordTable th{position:sticky;top:0;background:#f8fbff;color:#587091;font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+    .labelMini{font-size:13px;color:#607796;font-weight:700}
+    .reportBlock{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:14px}
+    .reportBlock h3{margin:0 0 8px;font-size:18px}
+    .reportList{margin:8px 0 0;padding-left:18px;color:#526a8c;line-height:1.6}
+    .reportGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .cotTableWrap{margin-top:14px;border:1px solid var(--line);border-radius:18px;overflow:auto}
+    .scrollBtn{scroll-margin-top:20px}
+    @media (max-width:1200px){
+      .topbar,.mainGrid,.split,.grid5,.controls,.actions{grid-template-columns:1fr}
+      h1{font-size:36px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="reportRoot">
+    <section class="topbar">
+      <div>
+        <div class="brand">
+          <img src="assets/logo-nomad.png" alt="Nomad Genetics">
+          <div>
+            <h1>Reporte diario ejecutivo<br>autónomo</h1>
+            <div class="sub">Herramienta independiente del cotizador para control diario de dinero real, deudas, costos clave y seguimiento operativo por prueba. El Excel financiero y Firebase quedan enlazados aquí, sin meter este módulo dentro del cotizador.</div>
+            <div class="pills">
+              <span class="pill soft">Autónomo e independiente</span>
+              <span id="firebasePill" class="pill warn">Firebase pendiente</span>
+              <span id="excelPill" class="pill warn">Excel pendiente</span>
+              <span class="pill">Edición diaria local</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <label class="btn blue" for="excelInput">Cargar Excel financiero</label>
+        <button id="syncFirebaseBtn" class="btn green">Vincular Firebase</button>
+        <button id="exportSeguimientoBtn" class="btn white">Exportar seguimiento CSV</button>
+        <button id="exportFinBtn" class="btn white">Exportar finanzas CSV</button>
+        <button id="exportPdfBtn" class="btn white">Descargar reporte PDF</button>
+        <button id="openCotizacionesBtn" class="btn ghost">Ver cotizaciones</button>
+        <button id="addManualBtn" class="btn ghost">Agregar registro manual</button>
+      </div>
+      <input id="excelInput" type="file" accept=".xlsx,.xls" hidden>
+    </section>
+
+    <section class="panel controls">
+      <div class="field">
+        <label>Buscar paciente, folio, proveedor o tipo de prueba</label>
+        <input id="searchInput" placeholder="Ej. Roche, Foundation, paciente o folio">
+      </div>
+      <div class="field">
+        <label>Proveedor</label>
+        <select id="providerFilter"><option value="Todos">Todos</option></select>
+      </div>
+      <div class="field">
+        <label>Estado del proceso</label>
+        <select id="statusFilter"><option value="Todos">Todos</option></select>
+      </div>
+      <div class="field">
+        <label>Estado de pago</label>
+        <select id="paymentFilter"><option value="Todos">Todos</option></select>
+      </div>
+      <div class="field">
+        <label>Agrupar seguimiento por</label>
+        <select id="groupByFilter">
+          <option value="provider">Proveedor</option>
+          <option value="status">Estado</option>
+          <option value="payment">Pago</option>
+          <option value="test">Tipo de prueba</option>
+        </select>
+      </div>
+      <button id="clearFiltersBtn" class="btn white">Limpiar filtros</button>
+      <button id="reloadBoardBtn" class="btn white">Recargar tablero</button>
+      <div class="hint">La herramienta mezcla dos fuentes: <strong>Excel financiero</strong> para deuda, nómina y costos, y <strong>Firebase / cotizaciones</strong> para construir el proceso de seguimiento. Cada registro también se puede editar y se conserva en <strong>localStorage</strong> para el reporte diario.</div>
+    </section>
+
+    <section class="grid5">
+      <article class="card tone-green">
+        <div class="kicker">Dinero entró a cuenta corriente</div>
+        <div id="kIngresoReal" class="big mono">$0</div>
+        <div id="kIngresoMeta" class="meta">0 registros con pago, abono o convenio</div>
+      </article>
+      <article class="card tone-blue">
+        <div class="kicker">Ingresos vinculados a pruebas</div>
+        <div id="kIngresosPruebas" class="big mono">$0</div>
+        <div id="kIngresosPruebasMeta" class="meta">0 pruebas en seguimiento</div>
+      </article>
+      <article id="openDeudaProvBtn" class="card tone-red clickable" title="Ver registros de deuda con proveedores">
+        <div class="kicker">Deuda con proveedores</div>
+        <div id="kDeudaProv" class="big mono">$0</div>
+        <div id="kDeudaProvMeta" class="meta">0 partidas pendientes</div>
+        <div class="labelMini">Haz clic para ver el detalle</div>
+      </article>
+      <article id="openDeudaFinBtn" class="card tone-amber clickable" title="Ver registros de deuda financiera">
+        <div class="kicker">Deuda financiera</div>
+        <div id="kDeudaFin" class="big mono">$0</div>
+        <div id="kDeudaFinMeta" class="meta">0 préstamos / créditos</div>
+        <div class="labelMini">Haz clic para ver el detalle</div>
+      </article>
+      <article id="openNominaBtn" class="card tone-violet clickable" title="Ver registros de nómina y costos">
+        <div class="kicker">Nómina + costos clave</div>
+        <div id="kNominaCostos" class="big mono">$0</div>
+        <div id="kNominaCostosMeta" class="meta">Nómina $0 · fijos $0 · variables $0</div>
+        <div class="labelMini">Haz clic para ver el detalle</div>
+      </article>
+    </section>
+
+    <section class="mainGrid">
+      <article class="panel">
+        <h2>Flujo de ingreso y mezcla comercial</h2>
+        <p>Visión ejecutiva del dinero real que ya entró y de la distribución comercial por concepto.</p>
+        <div class="chartBox"><canvas id="cashChart"></canvas></div>
+        <div id="cashSummary" class="footerNote"></div>
+        <div class="tableWrap" style="padding:0;margin-top:12px;box-shadow:none;border:none;background:transparent">
+          <table class="summaryTable">
+            <thead><tr><th>Concepto</th><th>Ingreso real</th><th>Monto en seguimiento</th><th>Expedientes</th></tr></thead>
+            <tbody id="cashDetailBody"></tbody>
+          </table>
+        </div>
+      </article>
+      <article class="panel">
+        <h2>Distribución de ventas por proveedor</h2>
+        <p>Roche / Foundation / Avenue / Guardant / otros, con base en el seguimiento y sus pagos.</p>
+        <div class="chartBox donut"><canvas id="providerChart"></canvas></div>
+        <div id="providerSummary" class="footerNote"></div>
+        <div class="tableWrap" style="padding:0;margin-top:12px;box-shadow:none;border:none;background:transparent">
+          <table class="summaryTable">
+            <thead><tr><th>Proveedor</th><th>Registros</th><th>Pagados / convenio</th><th>Monto visible</th></tr></thead>
+            <tbody id="providerDetailBody"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="split">
+      <article class="panel">
+        <h2>Embudo operativo</h2>
+        <p>Cotización → muestra → pago, tomando el estado real del seguimiento editable.</p>
+        <div class="chartBox pipeline"><canvas id="pipelineChart"></canvas></div>
+        <div class="legend">
+          <span class="chip gray">Cotización / coordinación</span>
+          <span class="chip yellow">Preparación / tránsito / muestra</span>
+          <span class="chip blue">Secuenciación / laboratorio</span>
+          <span class="chip green">Pago / cierre</span>
+        </div>
+      </article>
+      <article class="panel">
+        <h2>Resumen financiero por rubro</h2>
+        <p>Lectura directa del Excel: proveedores, préstamos, nómina y estructura de costos.</p>
+        <table class="summaryTable">
+          <thead>
+            <tr><th>Rubro</th><th>Monto</th><th>Detalle</th></tr>
+          </thead>
+          <tbody id="financialSummaryBody"></tbody>
+        </table>
+        <div class="footerNote">Se prioriza lo que pidieron ver sí o sí: entrada real, concepto del ingreso, deudas y operación.</div>
+      </article>
+    </section>
+
+    <section id="seguimientoSection" class="tableWrap scrollBtn">
+      <div class="groupHead">
+        <div>
+          <h2 style="margin:0 0 6px;font-size:26px">Seguimiento operativo editable</h2>
+          <div class="tiny">Tablero autónomo, visual y agrupado, parecido al seguimiento que compartiste.</div>
+        </div>
+        <div class="statusRow">
+          <span class="chip red">Rojo · coordinación / toma</span>
+          <span class="chip orange">Naranja · espera respuesta</span>
+          <span class="chip yellow">Amarillo · preparación / tránsito</span>
+          <span class="chip blue">Azul · secuenciación / proceso</span>
+          <span class="chip green">Verde · pagado / convenio</span>
+        </div>
+      </div>
+      <div id="boardContainer"></div>
+    </section>
+
+    <section class="panel" style="margin-top:18px">
+      <h2>Recomendaciones del día</h2>
+      <p>Espacio para observaciones ejecutivas, prioridades y acuerdos del día. Este texto también se incluye en el PDF.</p>
+      <div class="field">
+        <textarea id="dailyRecommendations" rows="6" placeholder="Ej. Priorizar cobro de casos con monto alto, revisar cuellos de botella, dar seguimiento a vencimientos cercanos..."></textarea>
+      </div>
+    </section>
+  </div>
+
+  <div id="financeModal" class="modal">
+    <div class="modalCard">
+      <div class="groupHead">
+        <div>
+          <h3 id="financeModalTitle">Detalle financiero</h3>
+          <div id="financeModalSubtitle" class="tiny">Registros del Excel financiero vinculados al indicador.</div>
+        </div>
+        <div class="rowActions">
+          <button id="addFinanceRecordBtn" class="btn blue mini">Agregar registro</button>
+          <button id="closeFinanceModalBtn" class="btn white mini">Cerrar</button>
+        </div>
+      </div>
+      <div id="financeModalResume" class="footerNote"></div>
+      <div class="financeTableWrap">
+        <table class="financeRecordTable">
+          <thead>
+            <tr><th>Categoría</th><th>Concepto</th><th>Proveedor</th><th>Referencia</th><th>Monto</th><th>Pago</th><th>Vencimiento</th><th>Observaciones</th><th>Acción</th></tr>
+          </thead>
+          <tbody id="financeModalBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="financeEditModal" class="modal">
+    <div class="modalCard">
+      <div class="groupHead">
+        <h3 id="financeEditTitle">Agregar registro financiero</h3>
+        <button id="closeFinanceEditModalBtn" class="btn white mini">Cerrar</button>
+      </div>
+      <div class="modalGrid">
+        <div class="field"><label>Categoría</label><select id="fCategory"></select></div>
+        <div class="field"><label>Concepto</label><input id="fConcept"></div>
+        <div class="field"><label>Proveedor</label><input id="fProvider"></div>
+        <div class="field"><label>Referencia</label><input id="fRef"></div>
+        <div class="field"><label>Monto</label><input id="fAmount" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Estado de pago</label><select id="fPaidStatus"><option>NO PAGADO</option><option>PAGO PARCIAL</option><option>PAGO TOTAL</option><option>ABONO</option><option>CONVENIO</option></select></div>
+        <div class="field"><label>Fecha de vencimiento</label><input id="fDueDate" type="date"></div>
+        <div class="field"><label>Fecha de pago</label><input id="fPaidDate" type="date"></div>
+        <div class="field full"><label>Descripción</label><input id="fDescription"></div>
+        <div class="field full"><label>Observaciones</label><textarea id="fObservations" rows="4"></textarea></div>
+      </div>
+      <div class="statusRow" style="justify-content:flex-end;margin-top:18px">
+        <button id="deleteFinanceRecordBtn" class="btn white">Eliminar local</button>
+        <button id="saveFinanceRecordBtn" class="btn blue">Guardar registro</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modalCard">
+      <div class="groupHead">
+        <h3>Editar registro de seguimiento</h3>
+        <button id="closeModalBtn" class="btn white mini">Cerrar</button>
+      </div>
+      <div class="modalGrid">
+        <div class="field"><label>Nombre / paciente</label><input id="mName"></div>
+        <div class="field"><label>Folio</label><input id="mFolio"></div>
+        <div class="field"><label>Proveedor</label><input id="mProvider"></div>
+        <div class="field"><label>Tipo de prueba</label><input id="mTest"></div>
+        <div class="field"><label>Estado del proceso</label>
+          <select id="mStatus"></select>
+        </div>
+        <div class="field"><label>Estado de pago</label>
+          <select id="mPayment"></select>
+        </div>
+        <div class="field"><label>Monto entrada real</label><input id="mAmount" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Fecha</label><input id="mDate" type="date"></div>
+        <div class="field full"><label>Observaciones</label><textarea id="mNotes" rows="4" placeholder="Notas del seguimiento, pago, coordinación, muestra o adeudo"></textarea></div>
+      </div>
+      <div class="statusRow" style="justify-content:flex-end;margin-top:18px">
+        <button id="deleteRecordBtn" class="btn white">Eliminar local</button>
+        <button id="saveRecordBtn" class="btn blue">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="cotizacionesModal" class="modal">
+    <div class="modalCard">
+      <div class="groupHead">
+        <div>
+          <h3>Cotizaciones y seguimiento</h3>
+          <div id="cotizacionesModalSubtitle" class="tiny">Vista interna de las cotizaciones enlazadas desde Firebase y registros manuales.</div>
+        </div>
+        <div class="rowActions">
+          <button id="goSeguimientoBtn" class="btn blue mini">Ir al tablero</button>
+          <button id="closeCotizacionesModalBtn" class="btn white mini">Cerrar</button>
+        </div>
+      </div>
+      <div class="cotTableWrap">
+        <table class="financeRecordTable">
+          <thead>
+            <tr><th>Paciente</th><th>Folio</th><th>Proveedor</th><th>Prueba</th><th>Estado</th><th>Pago</th><th>Monto</th><th>Fuente</th><th>Acción</th></tr>
+          </thead>
+          <tbody id="cotizacionesModalBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBXahr2H4b47gxzUw0u048727J53lEXmdM",
+      authDomain: "cotizador-nomad-chile.firebaseapp.com",
+      projectId: "cotizador-nomad-chile",
+      storageBucket: "cotizador-nomad-chile.firebasestorage.app",
+      messagingSenderId: "80153930609",
+      appId: "1:80153930609:web:e50ae1a6ff16694717e4d0"
+    };
+
+    const STORAGE = {
+      tracking: 'nomad_exec_tracking_overrides_v1',
+      excel: 'nomad_exec_finance_rows_v1',
+      settings: 'nomad_exec_settings_v1'
+    };
+
+    const STATUS_OPTIONS = [
+      'COORDINACIÓN', 'ESPERA RESPUESTA', 'ESPERANDO MUESTRA', 'PREPARACIÓN', 'EN TRÁNSITO',
+      'PATOLOGÍA', 'SECUENCIACIÓN', 'RESULTADO LISTO', 'ENTREGADO'
+    ];
+    const PAYMENT_OPTIONS = ['NO PAGADO', 'ABONO', 'PAGO PARCIAL', 'PAGO TOTAL', 'CONVENIO'];
+
+    const state = {
+      financeRows: [],
+      cotizaciones: [],
+      manualTracking: loadJSON(STORAGE.tracking, {}),
+      charts: {},
+      settings: loadJSON(STORAGE.settings, { cotizacionesUrl: 'dashboard.html' }),
+      currentEditId: null,
+      currentFinanceType: null,
+      currentFinanceEditId: null
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const fmtMoney = (n) => new Intl.NumberFormat('es-CL', { style:'currency', currency:'CLP', maximumFractionDigits:0 }).format(Number(n || 0));
+    const normalize = (v) => String(v ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    const todayStr = () => new Date().toISOString().slice(0,10);
+
+    for (const id of ['mStatus','mPayment']) {
+      const el = $(id);
+      const list = id === 'mStatus' ? STATUS_OPTIONS : PAYMENT_OPTIONS;
+      list.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v; el.appendChild(opt);
+      });
+    }
+
+    $('excelInput').addEventListener('change', handleExcelUpload);
+    $('syncFirebaseBtn').addEventListener('click', syncFirebase);
+    $('clearFiltersBtn').addEventListener('click', clearFilters);
+    $('reloadBoardBtn').addEventListener('click', renderAll);
+    $('openCotizacionesBtn').addEventListener('click', openCotizacionesModal);
+    $('exportSeguimientoBtn').addEventListener('click', exportSeguimientoCsv);
+    $('exportFinBtn').addEventListener('click', exportFinanzasCsv);
+    $('exportPdfBtn').addEventListener('click', exportExecutivePdf);
+    $('addManualBtn').addEventListener('click', () => openModal({ id: crypto.randomUUID(), source:'manual', date: todayStr(), status:'COORDINACIÓN', paymentStatus:'NO PAGADO', amountIn:0 }));
+    $('closeModalBtn').addEventListener('click', closeModal);
+    $('saveRecordBtn').addEventListener('click', saveModal);
+    $('deleteRecordBtn').addEventListener('click', deleteCurrentLocal);
+    $('closeFinanceModalBtn').addEventListener('click', closeFinanceModal);
+    $('closeCotizacionesModalBtn').addEventListener('click', closeCotizacionesModal);
+    $('goSeguimientoBtn').addEventListener('click', () => { closeCotizacionesModal(); $('seguimientoSection').scrollIntoView({ behavior:'smooth', block:'start' }); });
+    $('addFinanceRecordBtn').addEventListener('click', () => openFinanceEditModal());
+    $('closeFinanceEditModalBtn').addEventListener('click', closeFinanceEditModal);
+    $('saveFinanceRecordBtn').addEventListener('click', saveFinanceRecord);
+    $('deleteFinanceRecordBtn').addEventListener('click', deleteFinanceRecord);
+    $('openDeudaProvBtn').addEventListener('click', () => openFinanceModal('proveedores'));
+    $('openDeudaFinBtn').addEventListener('click', () => openFinanceModal('financiera'));
+    $('openNominaBtn').addEventListener('click', () => openFinanceModal('nomina'));
+    ['searchInput','providerFilter','statusFilter','paymentFilter','groupByFilter'].forEach(id => $(id).addEventListener('input', renderAll));
+
+    restoreExcel();
+    const recEl = $('dailyRecommendations');
+    if (recEl) {
+      recEl.value = localStorage.getItem('nomadDailyRecommendations') || '';
+      recEl.addEventListener('input', () => localStorage.setItem('nomadDailyRecommendations', recEl.value));
+    }
+    renderAll();
+
+    async function syncFirebase(){
+      $('firebasePill').textContent = 'Firebase conectando…';
+      $('firebasePill').className = 'pill warn';
+      try {
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        try { await signInAnonymously(auth); } catch {}
+        const db = getFirestore(app);
+        let snap;
+        try {
+          snap = await getDocs(query(collection(db, 'cotizaciones'), orderBy('savedAt', 'desc')));
+        } catch {
+          snap = await getDocs(collection(db, 'cotizaciones'));
+        }
+        state.cotizaciones = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        $('firebasePill').textContent = `Firebase listo · ${state.cotizaciones.length} cotizaciones`;
+        $('firebasePill').className = 'pill ok';
+        renderAll();
+      } catch (error) {
+        console.error(error);
+        $('firebasePill').textContent = 'Firebase sin lectura';
+        $('firebasePill').className = 'pill warn';
+      }
+    }
+
+    function handleExcelUpload(ev){
+      const file = ev.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false });
+        state.financeRows = rows.map((row, idx) => normalizeFinanceRow(row, idx));
+        localStorage.setItem(STORAGE.excel, JSON.stringify(state.financeRows));
+        $('excelPill').textContent = `Excel cargado · ${state.financeRows.length} filas`;
+        $('excelPill').className = 'pill ok';
+        populateFinanceCategorySelect();
+        renderAll();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function restoreExcel(){
+      const rows = loadJSON(STORAGE.excel, []);
+      if (rows.length){
+        state.financeRows = rows;
+        $('excelPill').textContent = `Excel listo · ${rows.length} filas`;
+        $('excelPill').className = 'pill ok';
+      }
+      populateFinanceCategorySelect();
+    }
+
+    function normalizeFinanceRow(row, idx){
+      const amountRaw = row['MONTO BRUTO / A PAGAR'] ?? row['MONTO'] ?? row['Monto'] ?? '';
+      const amount = parseMoney(amountRaw);
+      const fechaPago = row['FECHA DE PAGO'] || row['Fecha de pago'] || '';
+      const venc = row['FECHA DE VENCIMIENTO '] || row['FECHA DE VENCIMIENTO'] || row['Fecha de vencimiento'] || '';
+      return {
+        id: `fin-${idx}`,
+        category: cleanText(row['CATEGORÍA']),
+        concept: cleanText(row['CONCEPTO']),
+        provider: cleanText(row['PROVEEDOR']),
+        description: cleanText(row['DESCRIPCIÓN']),
+        ref: cleanText(row['REF: USUARIO / PACIENTE']),
+        amount,
+        document: cleanText(row['NÚMERO DE DOCUMENTO']),
+        dueDate: normalizeDate(venc),
+        observations: cleanText(row['OBSERVACIONES']),
+        paidStatus: cleanText(row['PAGADO']) || 'NO PAGADO',
+        paidDate: normalizeDate(fechaPago)
+      };
+    }
+
+    function buildTrackingRows(){
+      const base = [];
+      for (const c of state.cotizaciones){
+        const override = state.manualTracking[c.id] || {};
+        const items = Array.isArray(c.items) ? c.items : [];
+        const provider = override.provider || firstNonEmpty(
+          items.map(x => x.proveedor),
+          items.map(x => x.provider),
+          [c.provider, c.form?.proveedor]
+        ) || inferProviderFromBlob([c.form?.institucion, c.form?.medico, items.map(x => x.examen).join(' '), items.map(x => x.proveedor).join(' ')].join(' | '));
+        const test = override.test || firstNonEmpty(
+          items.map(x => x.examen),
+          items.map(x => x.nombre),
+          items.map(x => x.codigo),
+          [c.tipoPrueba]
+        ) || 'Prueba por definir';
+        const total = Number(c.totals?.total || c.totals?.subtotal || override.amountIn || 0);
+        base.push({
+          id: c.id,
+          source: 'firebase',
+          name: override.name || c.form?.paciente || c.form?.nombre || 'Paciente sin nombre',
+          folio: override.folio || c.folio || c.id,
+          provider: provider || 'Sin proveedor',
+          test: test,
+          status: override.status || inferStatus(c, items),
+          paymentStatus: override.paymentStatus || inferPayment(c),
+          amountIn: Number(override.amountIn ?? total ?? 0),
+          date: override.date || normalizeDate(c.fecha || c.createdAtLocal || c.savedAt?.toDate?.() || ''),
+          notes: override.notes || '',
+          concept: override.concept || test,
+          fromCotizacion: c
+        });
+      }
+      Object.values(state.manualTracking).forEach(v => {
+        if (v.source === 'manual') base.push(v);
+      });
+      return dedupeById(base);
+    }
+
+    function inferStatus(c, items){
+      const blob = normalize([c.seguimientoEstado, c.estado, c.form?.estado, items.map(x => x.estado).join(' '), items.map(x => x.examen).join(' ')].join(' | '));
+      if (blob.includes('entregado') || blob.includes('resultado')) return 'ENTREGADO';
+      if (blob.includes('secuenci')) return 'SECUENCIACIÓN';
+      if (blob.includes('patolog')) return 'PATOLOGÍA';
+      if (blob.includes('transit') || blob.includes('envio') || blob.includes('muestra')) return 'EN TRÁNSITO';
+      if (blob.includes('prepara')) return 'PREPARACIÓN';
+      if (blob.includes('espera')) return 'ESPERA RESPUESTA';
+      if (blob.includes('coordin')) return 'COORDINACIÓN';
+      return 'COORDINACIÓN';
+    }
+
+    function inferPayment(c){
+      const blob = normalize([c.estadoPago, c.pagoEstado, c.form?.pago, c.paymentStatus].join(' | '));
+      if (blob.includes('convenio')) return 'CONVENIO';
+      if (blob.includes('parcial')) return 'PAGO PARCIAL';
+      if (blob.includes('abono')) return 'ABONO';
+      if (blob.includes('pagado') || blob.includes('pago total')) return 'PAGO TOTAL';
+      return 'NO PAGADO';
+    }
+
+    function renderAll(){
+      const tracking = applyFilters(buildTrackingRows());
+      populateFilterOptions(buildTrackingRows());
+      renderKpis(tracking);
+      renderFinancialSummary();
+      renderBoard(tracking);
+      renderCharts(tracking);
+    }
+
+    function applyFilters(rows){
+      const q = normalize($('searchInput').value);
+      const provider = $('providerFilter').value;
+      const status = $('statusFilter').value;
+      const payment = $('paymentFilter').value;
+      return rows.filter(r => {
+        const blob = normalize([r.name, r.folio, r.provider, r.test, r.notes, r.concept].join(' | '));
+        return (!q || blob.includes(q))
+          && (provider === 'Todos' || r.provider === provider)
+          && (status === 'Todos' || r.status === status)
+          && (payment === 'Todos' || r.paymentStatus === payment);
+      });
+    }
+
+    function populateFilterOptions(rows){
+      fillSelect($('providerFilter'), ['Todos', ...unique(rows.map(r => r.provider).filter(Boolean))]);
+      fillSelect($('statusFilter'), ['Todos', ...unique(rows.map(r => r.status).filter(Boolean))]);
+      fillSelect($('paymentFilter'), ['Todos', ...unique(rows.map(r => r.paymentStatus).filter(Boolean))]);
+    }
+
+    function fillSelect(select, values){
+      const current = select.value;
+      const options = unique(values);
+      select.innerHTML = '';
+      options.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v; select.appendChild(opt);
+      });
+      if (options.includes(current)) select.value = current;
+    }
+
+    function getFinanceCategoryOptions(){
+      const categories = unique(state.financeRows.map(r => cleanText(r.category)).filter(Boolean));
+      const base = categories.length ? categories : ['Nómina / costos', 'Deuda con proveedores', 'Deuda financiera'];
+      return unique(base);
+    }
+
+    function populateFinanceCategorySelect(selected = ''){
+      const select = $('fCategory');
+      if (!select) return;
+      const options = getFinanceCategoryOptions();
+      const finalOptions = selected && !options.includes(selected) ? [...options, selected] : options;
+      select.innerHTML = '';
+      finalOptions.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        select.appendChild(opt);
+      });
+      select.value = finalOptions.includes(selected) ? selected : finalOptions[0] || '';
+    }
+
+    function openFinanceModal(type){
+      state.currentFinanceType = type;
+      const finance = state.financeRows || [];
+      let title = 'Detalle financiero';
+      let rows = [];
+      let subtitle = 'Registros del Excel financiero vinculados al indicador.';
+      if (type === 'proveedores') {
+        title = 'Detalle · deuda con proveedores';
+        subtitle = 'Facturas o partidas pendientes distintas a préstamos y nómina.';
+        rows = finance.filter(r => !isPaid(r.paidStatus) && !isFinancialDebt(r) && r.amount > 0 && !isNomina(r));
+      } else if (type === 'financiera') {
+        title = 'Detalle · deuda financiera';
+        subtitle = 'Préstamos, créditos y obligaciones financieras pendientes.';
+        rows = finance.filter(r => !isPaid(r.paidStatus) && isFinancialDebt(r) && r.amount > 0);
+      } else if (type === 'nomina') {
+        title = 'Detalle · nómina y costos clave';
+        subtitle = 'Nómina, costos fijos y variables leídos desde el Excel.';
+        rows = finance.filter(r => isNomina(r) || isFixedCost(r) || isVariableCost(r));
+      }
+      $('financeModalTitle').textContent = title;
+      $('financeModalSubtitle').textContent = subtitle;
+      $('financeModalResume').innerHTML = rows.length
+        ? `<strong>${rows.length}</strong> registros · total <strong>${fmtMoney(sum(rows.map(r=>r.amount)))}</strong>`
+        : 'No hay registros visibles para este indicador. Revisa si el Excel ya fue cargado o si las filas vienen con otro nombre de rubro.';
+      const body = $('financeModalBody');
+      body.innerHTML = '';
+      if (!rows.length){
+        body.innerHTML = `<tr><td colspan="9" class="tiny">No hay registros para mostrar.</td></tr>`;
+      } else {
+        rows.sort((a,b)=>Number(b.amount||0)-Number(a.amount||0)).forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${escapeHtml(r.category || '')}</td><td><strong>${escapeHtml(r.concept || r.description || '')}</strong><div class="tiny">${escapeHtml(r.description || '')}</div></td><td>${escapeHtml(r.provider || '')}</td><td>${escapeHtml(r.ref || '')}<div class="tiny">${escapeHtml(r.document || '')}</div></td><td class="mono">${fmtMoney(r.amount)}</td><td>${escapeHtml(r.paidStatus || '')}<div class="tiny">${escapeHtml(r.paidDate || '')}</div></td><td>${escapeHtml(r.dueDate || '')}</td><td>${escapeHtml(r.observations || '')}</td><td><button class="btn white mini" data-edit-fin="${r.id}">Editar</button></td>`;
+          body.appendChild(tr);
+        });
+      }
+      body.querySelectorAll('[data-edit-fin]').forEach(btn => btn.addEventListener('click', () => {
+        const found = rows.find(r => r.id === btn.dataset.editFin);
+        if (found) openFinanceEditModal(found);
+      }));
+      $('financeModal').classList.add('open');
+    }
+
+    function closeFinanceModal(){ $('financeModal').classList.remove('open'); }
+
+    function openFinanceEditModal(row = null){
+      state.currentFinanceEditId = row?.id || null;
+      $('financeEditTitle').textContent = row ? 'Editar registro financiero' : 'Agregar registro financiero';
+      const initialCategory = row?.category || inferFinanceCategory(state.currentFinanceType);
+      populateFinanceCategorySelect(initialCategory);
+      $('fConcept').value = row?.concept || '';
+      $('fProvider').value = row?.provider || '';
+      $('fRef').value = row?.ref || '';
+      $('fAmount').value = row?.amount || 0;
+      $('fPaidStatus').value = row?.paidStatus || 'NO PAGADO';
+      $('fDueDate').value = row?.dueDate || '';
+      $('fPaidDate').value = row?.paidDate || '';
+      $('fDescription').value = row?.description || '';
+      $('fObservations').value = row?.observations || '';
+      $('deleteFinanceRecordBtn').style.display = row ? 'inline-flex' : 'none';
+      $('financeEditModal').classList.add('open');
+    }
+
+    function closeFinanceEditModal(){ $('financeEditModal').classList.remove('open'); }
+
+    function saveFinanceRecord(){
+      const id = state.currentFinanceEditId || `fin-local-${crypto.randomUUID()}`;
+      const existingIx = state.financeRows.findIndex(r => r.id === id);
+      const record = {
+        id,
+        category: $('fCategory').value.trim(),
+        concept: $('fConcept').value.trim(),
+        provider: $('fProvider').value.trim(),
+        description: $('fDescription').value.trim(),
+        ref: $('fRef').value.trim(),
+        amount: Number($('fAmount').value || 0),
+        document: '',
+        dueDate: $('fDueDate').value || '',
+        observations: $('fObservations').value.trim(),
+        paidStatus: $('fPaidStatus').value,
+        paidDate: $('fPaidDate').value || '',
+        source: 'local'
+      };
+      if (existingIx >= 0) state.financeRows[existingIx] = record;
+      else state.financeRows.unshift(record);
+      localStorage.setItem(STORAGE.excel, JSON.stringify(state.financeRows));
+      $('excelPill').textContent = `Excel listo · ${state.financeRows.length} filas`;
+      $('excelPill').className = 'pill ok';
+      populateFinanceCategorySelect(record.category);
+      closeFinanceEditModal();
+      renderAll();
+      if (state.currentFinanceType) openFinanceModal(state.currentFinanceType);
+    }
+
+    function deleteFinanceRecord(){
+      const id = state.currentFinanceEditId;
+      if (!id) return;
+      state.financeRows = state.financeRows.filter(r => r.id !== id);
+      localStorage.setItem(STORAGE.excel, JSON.stringify(state.financeRows));
+      closeFinanceEditModal();
+      renderAll();
+      if (state.currentFinanceType) openFinanceModal(state.currentFinanceType);
+    }
+
+    function inferFinanceCategory(type){
+      if (type === 'proveedores') return 'Deuda con proveedores';
+      if (type === 'financiera') return 'Deuda financiera';
+      if (type === 'nomina') return 'Nómina / costos';
+      return '';
+    }
+
+
+    function renderKpis(tracking){
+      const enteredStatuses = new Set(['PAGO TOTAL','PAGO PARCIAL','ABONO','CONVENIO']);
+      const entered = tracking.filter(r => enteredStatuses.has(r.paymentStatus));
+      const ingresoReal = entered.reduce((s,r)=>s+Number(r.amountIn||0),0);
+      const ingresosPruebas = tracking.reduce((s,r)=>s+Number(r.amountIn||0),0);
+
+      const finance = state.financeRows;
+      const deudaProveedoresRows = finance.filter(r => !isPaid(r.paidStatus) && !isFinancialDebt(r) && r.amount > 0 && !isNomina(r));
+      const deudaFinRows = finance.filter(r => !isPaid(r.paidStatus) && isFinancialDebt(r) && r.amount > 0);
+      const nomina = finance.filter(r => isNomina(r)).reduce((s,r)=>s+r.amount,0);
+      const fijos = finance.filter(r => isFixedCost(r)).reduce((s,r)=>s+r.amount,0);
+      const variables = finance.filter(r => isVariableCost(r)).reduce((s,r)=>s+r.amount,0);
+
+      $('kIngresoReal').textContent = fmtMoney(ingresoReal);
+      $('kIngresoMeta').textContent = `${entered.length} registros con pago, abono o convenio`;
+      $('kIngresosPruebas').textContent = fmtMoney(ingresosPruebas);
+      $('kIngresosPruebasMeta').textContent = `${tracking.length} pruebas en seguimiento`;
+      $('kDeudaProv').textContent = fmtMoney(sum(deudaProveedoresRows.map(r=>r.amount)));
+      $('kDeudaProvMeta').textContent = `${deudaProveedoresRows.length} partidas pendientes a proveedor`;
+      $('kDeudaFin').textContent = fmtMoney(sum(deudaFinRows.map(r=>r.amount)));
+      $('kDeudaFinMeta').textContent = `${deudaFinRows.length} partidas de préstamos/créditos`;
+      $('kNominaCostos').textContent = fmtMoney(nomina + fijos + variables);
+      $('kNominaCostosMeta').textContent = `Nómina ${fmtMoney(nomina)} · fijos ${fmtMoney(fijos)} · variables ${fmtMoney(variables)}`;
+    }
+
+    function renderFinancialSummary(){
+      const body = $('financialSummaryBody');
+      body.innerHTML = '';
+      const finance = state.financeRows;
+      const rows = [
+        ['Deuda con proveedores', sum(finance.filter(r => !isPaid(r.paidStatus) && !isFinancialDebt(r) && !isNomina(r)).map(r => r.amount)), 'Facturas, reactivos, transporte, honorarios y pagos pendientes'],
+        ['Deuda financiera', sum(finance.filter(r => !isPaid(r.paidStatus) && isFinancialDebt(r)).map(r => r.amount)), 'Préstamos, créditos y obligaciones financieras'],
+        ['Nómina', sum(finance.filter(r => isNomina(r)).map(r => r.amount)), 'Nómina fija, previsión y conceptos salariales'],
+        ['Costos fijos', sum(finance.filter(r => isFixedCost(r)).map(r => r.amount)), 'Arriendo, contabilidad, servicios, patentes, seguros, gastos comunes'],
+        ['Costos variables', sum(finance.filter(r => isVariableCost(r)).map(r => r.amount)), 'Toma de muestra, reembolsos, kits, transporte, send out, reactivos']
+      ];
+      if (!rows.some(r => r[1])) {
+        body.innerHTML = `<tr><td colspan="3" class="tiny">Carga el Excel financiero para ver este resumen.</td></tr>`;
+        return;
+      }
+      rows.forEach(([label, amount, detail]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><strong>${label}</strong></td><td class="mono">${fmtMoney(amount)}</td><td>${detail}</td>`;
+        body.appendChild(tr);
+      });
+    }
+
+    function renderBoard(rows){
+      const container = $('boardContainer');
+      container.innerHTML = '';
+      if (!rows.length){
+        container.innerHTML = `<div class="empty">Aún no hay registros visibles. Carga el Excel, vincula Firebase o agrega un registro manual.</div>`;
+        return;
+      }
+      const key = $('groupByFilter').value;
+      const groups = new Map();
+      rows.forEach(r => {
+        const groupVal = key === 'provider' ? r.provider : key === 'status' ? r.status : key === 'payment' ? r.paymentStatus : r.test;
+        if (!groups.has(groupVal)) groups.set(groupVal, []);
+        groups.get(groupVal).push(r);
+      });
+      [...groups.entries()].sort((a,b)=>b[1].length-a[1].length).forEach(([group, list]) => {
+        const section = document.createElement('section');
+        section.className = 'groupSection';
+        const totalEntered = list.filter(r => ['PAGO TOTAL','PAGO PARCIAL','ABONO','CONVENIO'].includes(r.paymentStatus)).reduce((s,r)=>s+Number(r.amountIn||0),0);
+        section.innerHTML = `
+          <div class="groupHead">
+            <h3>${group || 'Sin grupo'}</h3>
+            <div class="statusRow">
+              <span class="countBadge">${list.length} registros</span>
+              <span class="countBadge">Entrada ${fmtMoney(totalEntered)}</span>
+            </div>
+          </div>
+          <table class="boardTable">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Proveedor examen</th>
+                <th>Estado</th>
+                <th>Tipo de examen solicitado</th>
+                <th>Estado de pago</th>
+                <th>Monto</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>`;
+        const tbody = section.querySelector('tbody');
+        list.sort((a,b)=>String(a.name).localeCompare(String(b.name),'es')).forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${escapeHtml(r.name)}</strong><div class="tiny">${escapeHtml(r.folio || '')}</div><div class="tiny">${escapeHtml(r.notes || '')}</div></td>
+            <td><span class="providerTag">${escapeHtml(r.provider)}</span></td>
+            <td><span class="chip ${statusClass(r.status)}">${escapeHtml(r.status)}</span></td>
+            <td><span class="chip ${testClass(r.test)} testCell">${escapeHtml(r.test)}</span></td>
+            <td><span class="chip ${paymentClass(r.paymentStatus)} payCell">${escapeHtml(r.paymentStatus)}</span></td>
+            <td class="mono"><strong>${fmtMoney(r.amountIn)}</strong><div class="tiny">${escapeHtml(r.date || '')}</div></td>
+            <td><div class="rowActions"><button class="btn white mini" data-edit="${r.id}">Editar</button></div></td>
+          `;
+          tbody.appendChild(tr);
+        });
+        container.appendChild(section);
+      });
+      container.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => {
+        const all = buildTrackingRows();
+        const found = all.find(r => r.id === btn.dataset.edit);
+        if (found) openModal(found);
+      }));
+    }
+
+    function renderCharts(tracking){
+      const enteredStatuses = ['PAGO TOTAL','PAGO PARCIAL','ABONO','CONVENIO'];
+      const entered = tracking.filter(r => enteredStatuses.includes(r.paymentStatus));
+      const paidByConcept = aggregate(entered, 'concept', 'amountIn', 8);
+      const allByConcept = aggregate(tracking, 'concept', 'amountIn', 8);
+      const providerVisible = aggregate(tracking, 'provider', 'amountIn', 7);
+      const providerPaid = aggregate(entered, 'provider', 'amountIn', 7);
+      const pipeline = {
+        cotizacion: tracking.filter(r => ['COORDINACIÓN','ESPERA RESPUESTA'].includes(r.status)).length,
+        muestra: tracking.filter(r => ['PREPARACIÓN','EN TRÁNSITO','PATOLOGÍA'].includes(r.status)).length,
+        laboratorio: tracking.filter(r => ['SECUENCIACIÓN','RESULTADO LISTO','ENTREGADO'].includes(r.status)).length,
+        pago: entered.length
+      };
+
+      const cashLabelsRaw = paidByConcept.labels.length ? paidByConcept.labels : (allByConcept.labels.length ? allByConcept.labels : ['Sin datos']);
+      const cashLabels = cashLabelsRaw.map(l => wrapLabel(l, 34));
+      const cashReal = cashLabelsRaw.map(l => {
+        const ix = paidByConcept.labels.indexOf(l);
+        return ix >= 0 ? paidByConcept.values[ix] : 0;
+      });
+      const cashVisible = cashLabelsRaw.map(l => {
+        const ix = allByConcept.labels.indexOf(l);
+        return ix >= 0 ? allByConcept.values[ix] : 0;
+      });
+
+      paintBar('cashChart', {
+        labels: cashLabels,
+        datasets: [
+          { label:'Ingreso real', data: cashReal, borderRadius:12, backgroundColor:'#70b4f4', maxBarThickness:34 },
+          { label:'Monto visible', data: cashVisible, borderRadius:12, backgroundColor:'#ee9eb0', maxBarThickness:34 }
+        ]
+      }, {
+        indexAxis:'y',
+        layout:{ padding:{ left: 24, right: 24, top: 10, bottom: 8 } },
+        interaction:{ mode:'nearest', axis:'y', intersect:false },
+        plugins:{
+          legend:{ display:true, position:'bottom', labels:{ color:'#405673', font:{ size:13, weight:'700' }, padding:16 } },
+          tooltip:{
+            enabled:true,
+            backgroundColor:'rgba(15,39,71,0.96)',
+            titleColor:'#fff', bodyColor:'#fff', padding:12, displayColors:true,
+            callbacks:{
+              title:(items)=> cashLabelsRaw[items[0].dataIndex] || '',
+              label:(ctx)=> `${ctx.dataset.label}: ${fmtMoney(ctx.parsed.x)}`
+            }
+          }
+        },
+        scales:{
+          y:{ ticks:{ color:'#334b6b', font:{ size:15, weight:'700' }, padding:8 }, grid:{ color:'rgba(89,113,146,0.12)' } },
+          x:{ ticks:{ color:'#556c8e', font:{ size:12, weight:'700' }, callback:(value)=> compactMoney(value) }, grid:{ color:'rgba(89,113,146,0.12)' } }
+        }
+      });
+
+      const providerLabels = providerVisible.labels.length ? providerVisible.labels : ['Sin datos'];
+      const providerValues = providerVisible.labels.length ? providerVisible.values : [1];
+      paintDoughnut('providerChart', {
+        labels: providerLabels,
+        datasets: [{ data: providerValues, borderWidth:0, hoverOffset:14 }]
+      });
+
+      paintBar('pipelineChart', {
+        labels: ['Cotización', 'Muestra', 'Laboratorio', 'Pago'],
+        datasets: [{ label:'Cantidad', data: [pipeline.cotizacion, pipeline.muestra, pipeline.laboratorio, pipeline.pago], borderRadius:10, backgroundColor:'#5f83cf', maxBarThickness:52 }]
+      }, {
+        plugins:{ legend:{ display:true, position:'bottom', labels:{ color:'#405673', font:{ size:13, weight:'700' } } }, tooltip:{ enabled:true, callbacks:{ label:(ctx)=> `Expedientes: ${ctx.parsed.y}` } } },
+        scales:{ y:{ ticks:{ stepSize:1, color:'#556c8e', font:{ size:12, weight:'700' } }, grid:{ color:'rgba(89,113,146,0.12)' } }, x:{ ticks:{ color:'#445b78', font:{ size:14, weight:'700' } }, grid:{ display:false } } }
+      });
+
+      renderCashDetail(tracking, entered, paidByConcept, allByConcept);
+      renderProviderDetail(tracking, entered, providerVisible, providerPaid);
+    }
+
+    function renderCashDetail(tracking, entered, paidByConcept, allByConcept){
+      const body = $('cashDetailBody');
+      const summary = $('cashSummary');
+      body.innerHTML = '';
+      if (!tracking.length){
+        summary.textContent = 'Todavía no hay registros de seguimiento para construir el flujo.';
+        body.innerHTML = '<tr><td colspan="4" class="tiny">Vincula Firebase o agrega registros manuales para ver la información.</td></tr>';
+        return;
+      }
+      if (!entered.length){
+        summary.innerHTML = 'Aún no hay pagos marcados como <strong>PAGO TOTAL / PAGO PARCIAL / ABONO / CONVENIO</strong>; por eso el gráfico muestra <strong>monto visible en seguimiento</strong> para que no quede vacío.';
+      } else {
+        summary.innerHTML = `Se muestran <strong>${entered.length}</strong> expedientes con entrada real y el monto total visible por concepto.`;
+      }
+      const counts = new Map();
+      tracking.forEach(r => counts.set(r.concept || 'Sin dato', (counts.get(r.concept || 'Sin dato') || 0) + 1));
+      const rows = allByConcept.labels.map((label, i) => {
+        const paidIx = paidByConcept.labels.indexOf(label);
+        return [label, paidIx >= 0 ? paidByConcept.values[paidIx] : 0, allByConcept.values[i], counts.get(label) || 0];
+      });
+      rows.slice(0,7).forEach(([label, real, visible, count]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><strong>${escapeHtml(label)}</strong></td><td class="mono">${fmtMoney(real)}</td><td class="mono">${fmtMoney(visible)}</td><td>${count}</td>`;
+        body.appendChild(tr);
+      });
+    }
+
+    function renderProviderDetail(tracking, entered, providerVisible, providerPaid){
+      const body = $('providerDetailBody');
+      const summary = $('providerSummary');
+      body.innerHTML = '';
+      if (!tracking.length){
+        summary.textContent = 'Todavía no hay registros para distribuir por proveedor.';
+        body.innerHTML = '<tr><td colspan="4" class="tiny">Cuando se vincule Firebase aquí aparecerá la mezcla por proveedor.</td></tr>';
+        return;
+      }
+      summary.innerHTML = `Distribución visible sobre <strong>${tracking.length}</strong> registros. También se resume cuántos ya tienen pago o convenio.`;
+      const counts = new Map();
+      const paidCounts = new Map();
+      tracking.forEach(r => counts.set(r.provider || 'Sin dato', (counts.get(r.provider || 'Sin dato') || 0) + 1));
+      entered.forEach(r => paidCounts.set(r.provider || 'Sin dato', (paidCounts.get(r.provider || 'Sin dato') || 0) + 1));
+      providerVisible.labels.slice(0,7).forEach((label, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><strong>${escapeHtml(label)}</strong></td><td>${counts.get(label) || 0}</td><td>${paidCounts.get(label) || 0}</td><td class="mono">${fmtMoney(providerVisible.values[i])}</td>`;
+        body.appendChild(tr);
+      });
+    }
+
+    
+function paintBar(id, data, extra = {}){
+  if (state.charts[id]) state.charts[id].destroy();
+  const extraPlugins = extra.plugins || {};
+  const extraRest = { ...extra };
+  delete extraRest.plugins;
+  state.charts[id] = new Chart($(id), {
+    type: 'bar',
+    data,
+    options: {
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
+      layout:{ padding:{ top:12, right:18, bottom:8, left:8 } },
+      interaction:{ mode:'nearest', intersect:false },
+      plugins:{
+        legend:{ display:true, labels:{ color:'#445b78', font:{ size:13, weight:'700' }, padding:14 } },
+        tooltip:{
+          enabled:true,
+          backgroundColor:'rgba(15,39,71,0.96)',
+          titleColor:'#fff',
+          bodyColor:'#fff',
+          padding:12,
+          callbacks:{ label:(ctx)=> `${ctx.dataset.label}: ${fmtMoney(ctx.parsed.x ?? ctx.parsed)}` }
+        },
+        ...extraPlugins
+      },
+      animation:{ duration:400 },
+      scales:{
+        x:{ beginAtZero:true, ticks:{ color:'#556c8e', font:{ size:12, weight:'700' }, callback:(v)=>compactMoney(v) }, grid:{ color:'rgba(85,108,142,.12)' } },
+        y:{ ticks:{ color:'#314c72', font:{ size:14, weight:'700' } }, grid:{ color:'rgba(85,108,142,.08)' } }
+      },
+      ...extraRest
+    }
+  });
+}
+
+
+function paintDoughnut(id, data){
+  if (state.charts[id]) state.charts[id].destroy();
+  state.charts[id] = new Chart($(id), {
+    type: 'doughnut',
+    data,
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      cutout:'54%',
+      layout:{ padding:{ top: 16, bottom: 28, left: 26, right: 26 } },
+      interaction:{ mode:'nearest', intersect:false },
+      plugins:{ 
+        legend:{ position:'bottom', labels:{ color:'#445b78', boxWidth:14, padding:18, font:{ size:13, weight:'700' } } },
+        tooltip:{ enabled:true, backgroundColor:'rgba(15,39,71,0.96)', titleColor:'#fff', bodyColor:'#fff', padding:12, callbacks:{ label:(ctx)=> `${ctx.label}: ${fmtMoney(ctx.parsed)}` } }
+      }
+    }
+  });
+}
+
+function openModal(row){
+      state.currentEditId = row.id;
+      $('mName').value = row.name || '';
+      $('mFolio').value = row.folio || '';
+      $('mProvider').value = row.provider || '';
+      $('mTest').value = row.test || '';
+      $('mStatus').value = row.status || STATUS_OPTIONS[0];
+      $('mPayment').value = row.paymentStatus || PAYMENT_OPTIONS[0];
+      $('mAmount').value = row.amountIn || 0;
+      $('mDate').value = row.date || todayStr();
+      $('mNotes').value = row.notes || '';
+      $('modal').classList.add('open');
+    }
+
+    function closeModal(){ $('modal').classList.remove('open'); }
+
+    function saveModal(){
+      const id = state.currentEditId || crypto.randomUUID();
+      const existing = state.manualTracking[id] || { id, source:'manual' };
+      state.manualTracking[id] = {
+        ...existing,
+        id,
+        source: existing.source || 'manual',
+        name: $('mName').value.trim(),
+        folio: $('mFolio').value.trim() || id,
+        provider: $('mProvider').value.trim() || 'Sin proveedor',
+        test: $('mTest').value.trim() || 'Prueba por definir',
+        status: $('mStatus').value,
+        paymentStatus: $('mPayment').value,
+        amountIn: Number($('mAmount').value || 0),
+        date: $('mDate').value || todayStr(),
+        notes: $('mNotes').value.trim(),
+        concept: $('mTest').value.trim() || 'Prueba por definir'
+      };
+      localStorage.setItem(STORAGE.tracking, JSON.stringify(state.manualTracking));
+      closeModal();
+      renderAll();
+    }
+
+    function deleteCurrentLocal(){
+      const id = state.currentEditId;
+      if (!id) return;
+      if (state.manualTracking[id]) delete state.manualTracking[id];
+      localStorage.setItem(STORAGE.tracking, JSON.stringify(state.manualTracking));
+      closeModal();
+      renderAll();
+    }
+
+
+function openCotizacionesModal(){
+  const body = $('cotizacionesModalBody');
+  const rows = buildTrackingRows();
+  body.innerHTML = '';
+  if (!rows.length){
+    body.innerHTML = '<tr><td colspan="9" class="tiny">Todavía no hay cotizaciones cargadas desde Firebase ni registros manuales.</td></tr>';
+  } else {
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><strong>${escapeHtml(r.name || 'Sin nombre')}</strong></td><td>${escapeHtml(r.folio || '-')}</td><td>${escapeHtml(r.provider || '-')}</td><td>${escapeHtml(r.test || '-')}</td><td><span class="chip ${statusClass(r.status)}">${escapeHtml(r.status || '-')}</span></td><td><span class="chip ${paymentClass(r.paymentStatus)}">${escapeHtml(r.paymentStatus || '-')}</span></td><td class="mono">${fmtMoney(r.amountIn || 0)}</td><td>${escapeHtml(r.source || 'firebase')}</td><td><button class="btn white mini" data-edit-track="${r.id}">Editar</button></td>`;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('[data-edit-track]').forEach(btn => btn.addEventListener('click', () => {
+      const row = rows.find(x => x.id === btn.dataset.editTrack);
+      if (row){ closeCotizacionesModal(); openModal(row); }
+    }));
+  }
+  $('cotizacionesModalSubtitle').textContent = `${rows.length} registros disponibles entre Firebase y captura manual.`;
+  $('cotizacionesModal').classList.add('open');
+}
+
+function closeCotizacionesModal(){ $('cotizacionesModal').classList.remove('open'); }
+
+async function exportExecutivePdf(){
+  const { jsPDF } = window.jspdf || {};
+  if (!jsPDF || !window.html2canvas){
+    alert('No se pudo preparar la descarga del PDF en este momento.');
+    return;
+  }
+
+  const rows = buildTrackingRows();
+  const paidRows = rows.filter(r => isEnteredMoney(r.paymentStatus));
+  const visibleRows = rows.filter(r => Number(r.amountIn || 0) > 0);
+  const totalEntered = sum(paidRows.map(r => r.amountIn));
+  const totalVisible = sum(visibleRows.map(r => r.amountIn));
+  const pendingVisible = Math.max(0, totalVisible - totalEntered);
+
+  const providerMix = aggregate(rows, 'provider', 'amountIn', 20);
+  const conceptMix = aggregate(paidRows.length ? paidRows : visibleRows, 'test', 'amountIn', 20);
+
+  const byProviderCount = new Map();
+  rows.forEach(r => byProviderCount.set(r.provider || 'Sin dato', (byProviderCount.get(r.provider || 'Sin dato') || 0) + 1));
+  const conceptCounts = new Map();
+  rows.forEach(r => conceptCounts.set(r.test || 'Sin dato', (conceptCounts.get(r.test || 'Sin dato') || 0) + 1));
+
+  const stageRows = rows.map(r => ({...r, stage: mapStage(r.status)}));
+  const stageLabels = ['Cotización', 'Muestra', 'Laboratorio', 'Pago'];
+  const stageCounts = Object.fromEntries(stageLabels.map(s => [s, 0]));
+  stageRows.forEach(r => stageCounts[r.stage] = (stageCounts[r.stage] || 0) + 1);
+  const stalledRows = stageRows.filter(r => r.stage !== 'Pago').sort((a,b)=>Number(b.amountIn||0)-Number(a.amountIn||0)).slice(0,8);
+
+  const financeRows = state.financeRows || [];
+  const pendingFinance = financeRows.filter(r => !isPaid(r.paidStatus));
+  const provDebt = pendingFinance.filter(r => !isFinancialDebt(r) && !isNomina(r));
+  const finDebt = pendingFinance.filter(r => isFinancialDebt(r));
+  const payrollRows = pendingFinance.filter(r => isNomina(r));
+  const fixedRows = pendingFinance.filter(r => isFixedCost(r) && !isNomina(r));
+  const variableRows = pendingFinance.filter(r => isVariableCost(r));
+
+  const debtByProvider = aggregateGeneric(provDebt, r => r.provider || r.concept || 'Sin proveedor', r => r.amount, 10);
+  const finByConcept = aggregateGeneric(finDebt, r => r.concept || r.provider || 'Sin dato', r => r.amount, 10);
+  const upcomingFinance = finDebt.filter(r => r.dueDate).sort((a,b)=> String(a.dueDate).localeCompare(String(b.dueDate))).slice(0,6);
+  const overdueProv = provDebt.filter(r => r.dueDate && r.dueDate < todayStr());
+  const overdueFin = finDebt.filter(r => r.dueDate && r.dueDate < todayStr());
+
+  const totalProvDebt = sum(provDebt.map(r => r.amount));
+  const totalFinDebt = sum(finDebt.map(r => r.amount));
+  const totalPayroll = sum(payrollRows.map(r => r.amount));
+  const totalFixed = sum(fixedRows.map(r => r.amount));
+  const totalVariable = sum(variableRows.map(r => r.amount));
+  const totalCosts = totalPayroll + totalFixed + totalVariable;
+  const balance = totalEntered - (totalProvDebt + totalFinDebt + totalCosts);
+
+  const topConcept = conceptMix.labels[0] ? `${conceptMix.labels[0]} (${fmtMoney(conceptMix.values[0])})` : 'Sin dato';
+  const topProvider = providerMix.labels[0] ? `${providerMix.labels[0]} (${fmtMoney(providerMix.values[0])})` : 'Sin dato';
+  const bottleneckStage = stageLabels.slice(0,3).sort((a,b)=>stageCounts[b]-stageCounts[a])[0] || 'Cotización';
+  const dayRecommendations = (document.getElementById('dailyRecommendations')?.value || '').trim();
+
+  const temp = document.createElement('div');
+  temp.style.position = 'fixed';
+  temp.style.left = '-10000px';
+  temp.style.top = '0';
+  temp.style.width = '1120px';
+  temp.style.background = '#f4f7fb';
+  temp.style.padding = '24px';
+  temp.style.fontFamily = 'Inter, Arial, sans-serif';
+
+  const pageShell = (bodyHtml, includeHeader = false) => `
+    <div class="pdf-page" style="width:1120px;background:#fff;border:1px solid #d9e3ef;border-radius:24px;padding:24px;box-shadow:0 14px 40px rgba(23,74,151,.08);margin-bottom:22px;box-sizing:border-box;overflow:hidden">
+      ${includeHeader ? `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:18px">
+        <div style="display:flex;gap:14px;align-items:center">
+          <img src="assets/logo-nomad.png" style="width:72px;height:72px;object-fit:contain;border:1px solid #d9e3ef;border-radius:16px;padding:10px;background:#fff">
+          <div>
+            <div style="font-size:32px;font-weight:800;color:#0f2747;line-height:1.05">Reporte diario ejecutivo</div>
+            <div style="font-size:15px;color:#607796;margin-top:6px">Estructura rubro por rubro para toma de decisiones · ${new Date().toLocaleDateString('es-CL')}</div>
+          </div>
+        </div>
+        <div style="font-size:13px;color:#607796;text-align:right;line-height:1.5">Nomad Genetics<br>Resumen para Guillermo</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+        ${metricCard('Dinero entró a cuenta corriente', fmtMoney(totalEntered), `${paidRows.length} registros con pago / parcial / abono / convenio`, '#f6fffa')}
+        ${metricCard('Pendiente visible por cobrar', fmtMoney(pendingVisible), `${Math.max(visibleRows.length - paidRows.length, 0)} registros aún no marcados como entrada real`, '#fffdfa')}
+        ${metricCard('Deudas totales', fmtMoney(totalProvDebt + totalFinDebt), `${provDebt.length} de proveedor · ${finDebt.length} financieras`, '#fff7f7')}
+        ${metricCard('Costos operativos', fmtMoney(totalCosts), `Nómina ${fmtMoney(totalPayroll)} · Fijos ${fmtMoney(totalFixed)} · Variables ${fmtMoney(totalVariable)}`, '#f8f8ff')}
+      </div>` : ''}
+      ${bodyHtml}
+    </div>`;
+
+  const pageOne = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      ${sectionBlock('1. Cuánto dinero entró a la cuenta corriente', `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+          ${miniMetric('Entrada real', fmtMoney(totalEntered))}
+          ${miniMetric('Monto visible', fmtMoney(totalVisible))}
+          ${miniMetric('Balance operativo', fmtMoney(balance))}
+        </div>
+        <div style="margin-top:8px;color:#526a8c;line-height:1.55;font-size:13px">Se consideran como entrada real los registros marcados con <strong>PAGO TOTAL</strong>, <strong>PAGO PARCIAL</strong>, <strong>ABONO</strong> o <strong>CONVENIO</strong>. El resto permanece como visible en seguimiento para diferenciar lo cobrado de lo pendiente.</div>
+      `)}
+      ${sectionBlock('2. Por qué concepto entra ese dinero', renderRankTable(conceptMix.labels.slice(0,8).map((label, i) => ({
+        label,
+        amount: conceptMix.values[i],
+        extra: `${conceptCounts.get(label) || 0} expedientes · ${percent(conceptMix.values[i], sum(conceptMix.values))}`
+      })), ['Concepto','Monto','Detalle']))}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      ${sectionBlock('3. Distribución de ventas', renderRankTable(providerMix.labels.slice(0,8).map((label, i) => ({
+        label,
+        amount: providerMix.values[i],
+        extra: `${byProviderCount.get(label) || 0} casos · ${percent(providerMix.values[i], sum(providerMix.values))}`
+      })), ['Proveedor','Monto visible','Participación']))}
+      ${sectionBlock('4. Estado del proceso', `
+        <table style="width:100%;border-collapse:collapse;margin-top:8px">
+          <thead><tr><th style="text-align:left;padding:8px 0;border-bottom:1px solid #e9eff6;color:#587091;font-size:11px;text-transform:uppercase">Etapa</th><th style="text-align:right;padding:8px 0;border-bottom:1px solid #e9eff6;color:#587091;font-size:11px;text-transform:uppercase">Expedientes</th></tr></thead>
+          <tbody>
+            ${stageLabels.map(s => `<tr><td style="padding:8px 0;border-bottom:1px solid #edf2f7;color:#324c72;font-size:13px">${s}</td><td style="padding:8px 0;border-bottom:1px solid #edf2f7;text-align:right;font-weight:800;color:#0c4088;font-size:13px">${stageCounts[s] || 0}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:8px;color:#526a8c;line-height:1.55;font-size:13px"><strong>Cuello de botella actual:</strong> ${bottleneckStage}.<br><strong>Casos a vigilar:</strong> ${stalledRows.length ? stalledRows.map(r => escapeHtml(r.name || r.folio || 'Caso')).slice(0,4).join(', ') : 'Sin casos pendientes destacados'}.</div>
+      `)}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${sectionBlock('5. Deuda con proveedores', `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+          ${miniMetric('Total pendiente', fmtMoney(totalProvDebt))}
+          ${miniMetric('Registros', String(provDebt.length))}
+          ${miniMetric('Vencidos', `${overdueProv.length}`)}
+        </div>
+        ${renderRankTable(debtByProvider.map(r => ({ label:r.label, amount:r.value, extra: '' })), ['Proveedor','Monto',''])}
+      `)}
+      ${sectionBlock('6. Deudas financieras', `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+          ${miniMetric('Total financiera', fmtMoney(totalFinDebt))}
+          ${miniMetric('Créditos', String(finDebt.length))}
+          ${miniMetric('Vencidos', `${overdueFin.length}`)}
+        </div>
+        ${renderRankTable(finByConcept.map(r => ({ label:r.label, amount:r.value, extra:'' })), ['Concepto / crédito','Monto',''])}
+        <div style="margin-top:8px;color:#526a8c;line-height:1.5;font-size:12px"><strong>Vencimientos próximos:</strong> ${upcomingFinance.length ? upcomingFinance.map(r => `${escapeHtml(r.concept || r.provider || 'Sin dato')} (${formatDateDisplay(r.dueDate)} · ${fmtMoney(r.amount)})`).join('; ') : 'Sin fechas registradas'}.</div>
+      `)}
+    </div>`;
+
+  const pageTwo = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      ${sectionBlock('7. Nómina', `
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px">
+          ${miniMetric('Total nómina', fmtMoney(totalPayroll))}
+          ${miniMetric('Registros', String(payrollRows.length))}
+        </div>
+        ${renderSimpleList(payrollRows, 8)}
+      `)}
+      ${sectionBlock('8. Costos fijos y variables', `
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+          ${miniMetric('Fijos', fmtMoney(totalFixed))}
+          ${miniMetric('Variables', fmtMoney(totalVariable))}
+          ${miniMetric('Total', fmtMoney(totalFixed + totalVariable))}
+        </div>
+        <div style="margin-top:8px;color:#526a8c;line-height:1.55;font-size:13px"><strong>Fijos:</strong> ${fixedRows.length ? fixedRows.slice(0,6).map(r => `${escapeHtml(r.concept || r.description || 'Sin dato')} (${fmtMoney(r.amount)})`).join('; ') : 'Sin registros'}<br><strong>Variables:</strong> ${variableRows.length ? variableRows.slice(0,6).map(r => `${escapeHtml(r.concept || r.description || 'Sin dato')} (${fmtMoney(r.amount)})`).join('; ') : 'Sin registros'}.</div>
+      `)}
+    </div>
+
+    ${sectionBlock('9. Conclusión ejecutiva', `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+        <div>
+          <div style="font-weight:800;color:#0f2747;margin-bottom:8px;font-size:15px">Qué revisar hoy</div>
+          <ul style="margin:0;padding-left:18px;color:#526a8c;line-height:1.65;font-size:13px">
+            <li>Entrada real: <strong>${fmtMoney(totalEntered)}</strong>.</li>
+            <li>Salida comprometida total: <strong>${fmtMoney(totalProvDebt + totalFinDebt + totalCosts)}</strong>.</li>
+            <li>Balance operativo estimado: <strong>${fmtMoney(balance)}</strong>.</li>
+            <li>Proveedor con mayor peso: <strong>${escapeHtml(topProvider)}</strong>.</li>
+            <li>Prueba con mayor impacto: <strong>${escapeHtml(topConcept)}</strong>.</li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-weight:800;color:#0f2747;margin-bottom:8px;font-size:15px">Lectura ejecutiva</div>
+          <div style="color:#526a8c;line-height:1.65;font-size:13px">
+            Guillermo puede usar este reporte para separar <strong>lo cobrado</strong> de <strong>lo pendiente</strong>, identificar qué pruebas y proveedores pesan más, y detectar si el cuello de botella está en <strong>${bottleneckStage}</strong>. Además, el bloque financiero deja visible el total comprometido entre proveedores, deuda financiera, nómina y costos operativos.
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px;border:1px dashed #c9d8eb;border-radius:16px;padding:14px 16px;min-height:130px;background:#fbfdff">
+        <div style="font-weight:800;color:#0f2747;margin-bottom:8px;font-size:15px">10. Recomendaciones del día</div>
+        <div style="color:#526a8c;line-height:1.65;white-space:pre-wrap;font-size:13px">${escapeHtml(dayRecommendations || 'Espacio destinado para recomendaciones, prioridades y acuerdos del día.')}</div>
+      </div>
+    `)}
+  `;
+
+  temp.innerHTML = pageShell(pageOne, true) + pageShell(pageTwo, false);
+  document.body.appendChild(temp);
+  try {
+    const pages = temp.querySelectorAll('.pdf-page');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    const margin = 6;
+    const imgW = pdfW - margin * 2;
+
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#f4f7fb', useCORS: true });
+      const img = canvas.toDataURL('image/png');
+      const imgH = canvas.height * imgW / canvas.width;
+      if (i > 0) pdf.addPage();
+      pdf.addImage(img, 'PNG', margin, margin, imgW, imgH, '', 'FAST');
+    }
+    pdf.save('nomad_reporte_diario_ejecutivo_rubro_por_rubro.pdf');
+  } finally {
+    temp.remove();
+  }
+}
+
+
+    function exportSeguimientoCsv(){
+      const rows = buildTrackingRows().map(r => ({
+        nombre:r.name, folio:r.folio, proveedor:r.provider, tipo_prueba:r.test, estado:r.status,
+        estado_pago:r.paymentStatus, monto:r.amountIn, fecha:r.date, notas:r.notes
+      }));
+      downloadCsv(rows, 'nomad_seguimiento_ejecutivo.csv');
+    }
+
+    function exportFinanzasCsv(){
+      downloadCsv(state.financeRows, 'nomad_finanzas_ejecutivas.csv');
+    }
+
+    function clearFilters(){
+      $('searchInput').value = '';
+      $('providerFilter').value = 'Todos';
+      $('statusFilter').value = 'Todos';
+      $('paymentFilter').value = 'Todos';
+      $('groupByFilter').value = 'provider';
+      renderAll();
+    }
+
+    function aggregate(rows, key, valueKey, limit = 10){
+      const map = new Map();
+      rows.forEach(r => {
+        const k = r[key] || 'Sin dato';
+        map.set(k, (map.get(k) || 0) + Number(r[valueKey] || 0));
+      });
+      const ordered = [...map.entries()].sort((a,b)=>b[1]-a[1]).slice(0,limit);
+      return { labels: ordered.map(x=>x[0]), values: ordered.map(x=>x[1]) };
+    }
+
+    function isPaid(status){ return normalize(status).includes('pago total'); }
+    function isEnteredMoney(status){ const s = normalize(status); return s.includes('pago total') || s.includes('pago parcial') || s.includes('abono') || s.includes('convenio'); }
+    function isFinancialDebt(r){ return normalize([r.category, r.concept, r.description].join(' | ')).includes('prestamo') || normalize([r.category, r.concept, r.description].join(' | ')).includes('credito'); }
+    function isNomina(r){ return normalize([r.category, r.concept, r.description].join(' | ')).includes('nomina') || normalize([r.category, r.concept, r.description].join(' | ')).includes('previred'); }
+    function isFixedCost(r){ const blob = normalize([r.category, r.concept].join(' | ')); return blob.includes('gastos fijos') || ['arriendo','contabilidad','alarma','electricidad','gastos comunes','telefonia','internet','patentes','seguros'].some(k => blob.includes(k)); }
+    function isVariableCost(r){ const blob = normalize([r.category, r.concept].join(' | ')); return blob.includes('costos variables') || blob.includes('gastos variables'); }
+    function wrapLabel(label, size = 24){
+      const text = String(label || 'Sin dato');
+      if (text.length <= size) return text;
+      const words = text.split(' ');
+      const lines = [];
+      let current = '';
+      words.forEach(word => {
+        const test = current ? `${current} ${word}` : word;
+        if (test.length > size) {
+          if (current) lines.push(current);
+          current = word;
+        } else {
+          current = test;
+        }
+      });
+      if (current) lines.push(current);
+      return lines.slice(0,3);
+    }
+    function compactMoney(value){
+      const n = Number(value || 0);
+      if (Math.abs(n) >= 1000000) return `${(n/1000000).toFixed(0)}M`;
+      if (Math.abs(n) >= 1000) return `${(n/1000).toFixed(0)}k`;
+      return String(n);
+    }
+
+
+    function mapStage(status){
+      const s = normalize(status);
+      if (s.includes('pago')) return 'Pago';
+      if (s.includes('secuenci') || s.includes('patolog') || s.includes('laborat') || s.includes('resultado') || s.includes('entregado')) return 'Laboratorio';
+      if (s.includes('muestra') || s.includes('transit') || s.includes('prepara') || s.includes('toma')) return 'Muestra';
+      return 'Cotización';
+    }
+    function aggregateGeneric(rows, keyFn, valueFn, limit = 10){
+      const map = new Map();
+      rows.forEach(r => {
+        const key = keyFn(r) || 'Sin dato';
+        map.set(key, (map.get(key) || 0) + Number(valueFn(r) || 0));
+      });
+      return [...map.entries()].sort((a,b)=>b[1]-a[1]).slice(0, limit).map(([label, value]) => ({ label, value }));
+    }
+    function percent(value, total){
+      const v = Number(value || 0), t = Number(total || 0);
+      return t > 0 ? `${((v / t) * 100).toFixed(1)}%` : '0%';
+    }
+    function metricCard(title, value, meta, bg){
+      return `<div style="background:${bg};border:1px solid #d9e3ef;border-radius:18px;padding:16px"><div style="font-size:13px;font-weight:800;color:#5f7698;text-transform:uppercase;line-height:1.25">${title}</div><div style="font-size:26px;font-weight:800;color:#0c4088;margin-top:8px;line-height:1.05;letter-spacing:-.02em;word-break:break-word">${value}</div><div style="font-size:13px;color:#607796;margin-top:6px;line-height:1.45">${meta}</div></div>`;
+    }
+    function miniMetric(title, value){
+      return `<div style="background:#f8fbff;border:1px solid #e5edf7;border-radius:14px;padding:12px"><div style="font-size:11px;color:#607796;font-weight:800;text-transform:uppercase;line-height:1.2">${title}</div><div style="font-size:17px;font-weight:800;color:#0c4088;margin-top:7px;line-height:1.1;letter-spacing:-.015em;word-break:break-word">${value}</div></div>`;
+    }
+    function sectionBlock(title, body){
+      return `<div style="background:#fff;border:1px solid #d9e3ef;border-radius:18px;padding:18px"><div style="font-size:20px;font-weight:800;color:#0f2747;margin-bottom:8px">${title}</div>${body}</div>`;
+    }
+    function renderRankTable(rows, headers){
+      if (!rows.length) return '<div style="color:#607796;margin-top:8px">Sin información disponible en este rubro.</div>';
+      return `<table style="width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed"><colgroup><col style="width:55%"><col style="width:21%"><col style="width:24%"></colgroup><thead><tr>${headers.map((h,i) => `<th style="text-align:${i===1?'right':'left'};padding:8px 6px;border-bottom:1px solid #e9eff6;color:#587091;font-size:11px;text-transform:uppercase;line-height:1.2">${h || '&nbsp;'}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr><td style="padding:10px 6px;border-bottom:1px solid #edf2f7;color:#324c72;font-size:11px;line-height:1.28;word-break:break-word">${escapeHtml(r.label || 'Sin dato')}</td><td style="padding:10px 6px;border-bottom:1px solid #edf2f7;font-weight:800;color:#0c4088;text-align:right;font-size:10px;line-height:1.2;word-break:break-word">${fmtMoney(r.amount || 0)}</td><td style="padding:10px 6px;border-bottom:1px solid #edf2f7;color:#526a8c;font-size:11px;line-height:1.28">${r.extra || ''}</td></tr>`).join('')}</tbody></table>`;
+    }
+    function renderSimpleList(rows, limit = 6){
+      if (!rows.length) return '<div style="color:#607796;margin-top:10px">Sin registros pendientes en este rubro.</div>';
+      return `<div style="margin-top:10px">${rows.slice(0, limit).map(r => `<div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #edf2f7;padding:8px 0"><div style="color:#324c72">${escapeHtml(r.concept || r.description || r.provider || 'Sin dato')}</div><div style="font-weight:800;color:#0c4088">${fmtMoney(r.amount)}</div></div>`).join('')}</div>`;
+    }
+    function formatDateDisplay(v){
+      if (!v) return '-';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(v))) {
+        const [y,m,d] = String(v).split('-');
+        return `${d}-${m}-${y}`;
+      }
+      return String(v);
+    }
+    function parseMoney(v){
+      if (typeof v === 'number') return v;
+      const s = String(v ?? '').replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+      const n = Number(s);
+      return Number.isFinite(n) ? n : 0;
+    }
+    function normalizeDate(v){
+      if (!v) return '';
+      if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10);
+      const d = new Date(v);
+      return Number.isNaN(+d) ? String(v).slice(0,10) : d.toISOString().slice(0,10);
+    }
+    function loadJSON(key, fallback){ try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
+    function cleanText(v){ return String(v ?? '').trim(); }
+    function sum(arr){ return arr.reduce((s,n)=>s+Number(n||0),0); }
+    function unique(arr){ return [...new Set(arr)]; }
+    function firstNonEmpty(...groups){ for (const g of groups.flat()) { if (g) return g; } return ''; }
+    function dedupeById(rows){ const map = new Map(); rows.forEach(r => map.set(r.id, r)); return [...map.values()]; }
+    function inferProviderFromBlob(blob){
+      const s = normalize(blob);
+      if (s.includes('roche')) return 'Roche';
+      if (s.includes('foundation')) return 'Foundation';
+      if (s.includes('avenio') || s.includes('aveneo')) return 'Avenue';
+      if (s.includes('guardant')) return 'Guardant Health';
+      if (s.includes('ssgg')) return 'SSGG';
+      return 'Otros';
+    }
+    function statusClass(status){
+      const s = normalize(status);
+      if (s.includes('coordin') || s.includes('toma')) return 'red';
+      if (s.includes('espera')) return 'orange';
+      if (s.includes('prepara') || s.includes('transit') || s.includes('patolog')) return 'yellow';
+      if (s.includes('secuenci') || s.includes('resultado')) return 'blue';
+      if (s.includes('entregado')) return 'green';
+      return 'gray';
+    }
+    function paymentClass(status){
+      const s = normalize(status);
+      if (s.includes('convenio') || s.includes('total')) return 'green';
+      if (s.includes('parcial')) return 'green';
+      if (s.includes('abono')) return 'orange';
+      if (s.includes('no pagado')) return 'red';
+      return 'gray';
+    }
+    function testClass(test){
+      const s = normalize(test);
+      if (s.includes('guardant')) return 'blue';
+      if (s.includes('foundation')) return 'red';
+      if (s.includes('sf3b1') || s.includes('analisis')) return 'yellow';
+      if (s.includes('perls')) return 'blue';
+      return 'gray';
+    }
+    function escapeHtml(s){ return String(s ?? '').replace(/[&<>\"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+    function downloadCsv(rows, filename){
+      const data = Array.isArray(rows) ? rows : [];
+      if (!data.length) return;
+      const headers = Object.keys(data[0]);
+      const csv = [headers.join(','), ...data.map(row => headers.map(h => JSON.stringify(row[h] ?? '')).join(','))].join('\n');
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
