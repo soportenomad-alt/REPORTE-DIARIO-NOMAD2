@@ -141,10 +141,10 @@
             <h1>Reporte diario ejecutivo<br>autónomo</h1>
             <div class="sub">Herramienta focalizada para reportes diarios.</div>
             <div class="pills">
-              <span class="pill soft">Autónomo e independiente</span>
+              <span class="pill soft">Autónomo + Firebase financiero</span>
               <span id="firebasePill" class="pill warn">Firebase pendiente</span>
               <span id="excelPill" class="pill warn">Excel pendiente</span>
-              <span class="pill">Edición diaria local</span>
+              <span class="pill">Edición local y nube</span>
             </div>
           </div>
         </div>
@@ -189,7 +189,7 @@
       </div>
       <button id="clearFiltersBtn" class="btn white">Limpiar filtros</button>
       <button id="reloadBoardBtn" class="btn white">Recargar tablero</button>
-      <div class="hint">La herramienta mezcla dos fuentes: <strong>Excel financiero</strong> para deuda, nómina y costos, y <strong>Firebase / cotizaciones</strong> para construir el proceso de seguimiento. Cada registro también se puede editar y se conserva en <strong>localStorage</strong> para el reporte diario.</div>
+      <div class="hint">La herramienta mezcla dos fuentes: <strong>Excel financiero</strong> para deuda, nómina y costos, y <strong>Firebase / cotizaciones</strong> para construir el proceso de seguimiento. Los registros financieros nuevos pueden guardarse en <strong>Firebase financiero</strong> y también se conserva respaldo en <strong>localStorage</strong>.</div>
     </section>
 
     <section class="grid5">
@@ -405,16 +405,25 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, orderBy, doc, setDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
-    const firebaseConfig = {
+    const cotizacionesFirebaseConfig = {
       apiKey: "AIzaSyBXahr2H4b47gxzUw0u048727J53lEXmdM",
       authDomain: "cotizador-nomad-chile.firebaseapp.com",
       projectId: "cotizador-nomad-chile",
       storageBucket: "cotizador-nomad-chile.firebasestorage.app",
       messagingSenderId: "80153930609",
       appId: "1:80153930609:web:e50ae1a6ff16694717e4d0"
+    };
+
+    const finanzasFirebaseConfig = {
+      apiKey: "AIzaSyCyuewoO6RwSZHXyRuoz7mwgF1WMwYPtH4",
+      authDomain: "reporte-diario-nomad.firebaseapp.com",
+      projectId: "reporte-diario-nomad",
+      storageBucket: "reporte-diario-nomad.firebasestorage.app",
+      messagingSenderId: "120568873523",
+      appId: "1:120568873523:web:ae7459ffbad68feff3d946"
     };
 
     const STORAGE = {
@@ -430,6 +439,8 @@
     const PAYMENT_OPTIONS = ['NO PAGADO', 'ABONO', 'PAGO PARCIAL', 'PAGO TOTAL', 'CONVENIO'];
 
     const state = {
+      excelRows: [],
+      financeFirebaseRows: [],
       financeRows: [],
       cotizaciones: [],
       manualTracking: loadJSON(STORAGE.tracking, {}),
@@ -437,7 +448,11 @@
       settings: loadJSON(STORAGE.settings, { cotizacionesUrl: 'dashboard.html' }),
       currentEditId: null,
       currentFinanceType: null,
-      currentFinanceEditId: null
+      currentFinanceEditId: null,
+      cotizacionesApp: null,
+      finanzasApp: null,
+      cotizacionesDb: null,
+      finanzasDb: null
     };
 
     const $ = (id) => document.getElementById(id);
@@ -482,26 +497,140 @@
     const recEl = $('dailyRecommendations');
     if (recEl) {
       recEl.value = localStorage.getItem('nomadDailyRecommendations') || '';
-      recEl.addEventListener('input', () => localStorage.setItem('nomadDailyRecommendations', recEl.value));
+      recEl.addEventListener('input', debounce(async () => {
+        localStorage.setItem('nomadDailyRecommendations', recEl.value);
+        if (state.finanzasDb) {
+          try { await saveDailyRecommendation(); } catch (error) { console.warn('No se pudo guardar recomendación diaria en Firebase', error); }
+        }
+      }, 600));
     }
     renderAll();
+    syncFirebase();
+
+    function recomputeFinanceRows(){
+      const map = new Map();
+      [...state.excelRows, ...state.financeFirebaseRows].forEach(row => {
+        if (row?.id) map.set(row.id, row);
+      });
+      state.financeRows = Array.from(map.values());
+    }
+
+    function debounce(fn, wait = 400){
+      let timer;
+      return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+      };
+    }
+
+    async function ensureCotizacionesConnection(){
+      if (state.cotizacionesDb) return state.cotizacionesDb;
+      if (!state.cotizacionesApp) state.cotizacionesApp = initializeApp(cotizacionesFirebaseConfig, 'cotizacionesApp');
+      const auth = getAuth(state.cotizacionesApp);
+      try { await signInAnonymously(auth); } catch {}
+      state.cotizacionesDb = getFirestore(state.cotizacionesApp);
+      return state.cotizacionesDb;
+    }
+
+    async function ensureFinanzasConnection(){
+      if (state.finanzasDb) return state.finanzasDb;
+      if (!state.finanzasApp) state.finanzasApp = initializeApp(finanzasFirebaseConfig, 'finanzasApp');
+      const auth = getAuth(state.finanzasApp);
+      try { await signInAnonymously(auth); } catch (error) { console.warn('No se pudo iniciar sesión anónima en Firebase financiero', error); }
+      state.finanzasDb = getFirestore(state.finanzasApp);
+      return state.finanzasDb;
+    }
+
+    function normalizeFinanceFirebaseRow(id, row = {}){
+      return {
+        id,
+        category: cleanText(row.category),
+        concept: cleanText(row.concept),
+        provider: cleanText(row.provider),
+        description: cleanText(row.description),
+        ref: cleanText(row.ref),
+        amount: Number(row.amount || 0),
+        document: cleanText(row.document),
+        dueDate: normalizeDate(row.dueDate || ''),
+        observations: cleanText(row.observations),
+        paidStatus: cleanText(row.paidStatus) || 'NO PAGADO',
+        paidDate: normalizeDate(row.paidDate || ''),
+        source: row.source || 'firebase-finanzas'
+      };
+    }
+
+    async function loadFinanceFirebaseRows(){
+      const db = await ensureFinanzasConnection();
+      let snap;
+      try {
+        snap = await getDocs(query(collection(db, 'registrosFinancieros'), orderBy('updatedAt', 'desc')));
+      } catch {
+        snap = await getDocs(collection(db, 'registrosFinancieros'));
+      }
+      state.financeFirebaseRows = snap.docs.map(d => normalizeFinanceFirebaseRow(d.id, d.data()));
+      recomputeFinanceRows();
+      return state.financeFirebaseRows;
+    }
+
+    async function saveFinanceRowToFirebase(record){
+      const db = await ensureFinanzasConnection();
+      await setDoc(doc(db, 'registrosFinancieros', record.id), {
+        category: record.category || '',
+        concept: record.concept || '',
+        provider: record.provider || '',
+        description: record.description || '',
+        ref: record.ref || '',
+        amount: Number(record.amount || 0),
+        document: record.document || '',
+        dueDate: record.dueDate || '',
+        observations: record.observations || '',
+        paidStatus: record.paidStatus || 'NO PAGADO',
+        paidDate: record.paidDate || '',
+        source: 'firebase-finanzas',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+
+    async function deleteFinanceRowFromFirebase(id){
+      const db = await ensureFinanzasConnection();
+      await deleteDoc(doc(db, 'registrosFinancieros', id));
+    }
+
+    async function loadDailyRecommendation(){
+      const db = await ensureFinanzasConnection();
+      const snap = await getDoc(doc(db, 'recomendacionesDiarias', todayStr()));
+      if (!snap.exists()) return;
+      const value = snap.data()?.recommendation || '';
+      if (value && !$('dailyRecommendations').value.trim()) {
+        $('dailyRecommendations').value = value;
+        localStorage.setItem('nomadDailyRecommendations', value);
+      }
+    }
+
+    async function saveDailyRecommendation(){
+      const db = await ensureFinanzasConnection();
+      await setDoc(doc(db, 'recomendacionesDiarias', todayStr()), {
+        fecha: todayStr(),
+        recommendation: ($('dailyRecommendations')?.value || '').trim(),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
 
     async function syncFirebase(){
       $('firebasePill').textContent = 'Firebase conectando…';
       $('firebasePill').className = 'pill warn';
       try {
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        try { await signInAnonymously(auth); } catch {}
-        const db = getFirestore(app);
+        const cotDb = await ensureCotizacionesConnection();
         let snap;
         try {
-          snap = await getDocs(query(collection(db, 'cotizaciones'), orderBy('savedAt', 'desc')));
+          snap = await getDocs(query(collection(cotDb, 'cotizaciones'), orderBy('savedAt', 'desc')));
         } catch {
-          snap = await getDocs(collection(db, 'cotizaciones'));
+          snap = await getDocs(collection(cotDb, 'cotizaciones'));
         }
         state.cotizaciones = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        $('firebasePill').textContent = `Firebase listo · ${state.cotizaciones.length} cotizaciones`;
+        await loadFinanceFirebaseRows();
+        await loadDailyRecommendation();
+        $('firebasePill').textContent = `Firebase listo · ${state.cotizaciones.length} cotizaciones · ${state.financeFirebaseRows.length} registros financieros`;
         $('firebasePill').className = 'pill ok';
         renderAll();
       } catch (error) {
@@ -519,9 +648,10 @@
         const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false });
-        state.financeRows = rows.map((row, idx) => normalizeFinanceRow(row, idx));
-        localStorage.setItem(STORAGE.excel, JSON.stringify(state.financeRows));
-        $('excelPill').textContent = `Excel cargado · ${state.financeRows.length} filas`;
+        state.excelRows = rows.map((row, idx) => normalizeFinanceRow(row, idx));
+        recomputeFinanceRows();
+        localStorage.setItem(STORAGE.excel, JSON.stringify(state.excelRows));
+        $('excelPill').textContent = `Excel cargado · ${state.excelRows.length} filas`;
         $('excelPill').className = 'pill ok';
         populateFinanceCategorySelect();
         renderAll();
@@ -532,7 +662,8 @@
     function restoreExcel(){
       const rows = loadJSON(STORAGE.excel, []);
       if (rows.length){
-        state.financeRows = rows;
+        state.excelRows = rows;
+        recomputeFinanceRows();
         $('excelPill').textContent = `Excel listo · ${rows.length} filas`;
         $('excelPill').className = 'pill ok';
       }
@@ -745,7 +876,7 @@
 
     function closeFinanceEditModal(){ $('financeEditModal').classList.remove('open'); }
 
-    function saveFinanceRecord(){
+    async function saveFinanceRecord(){
       const id = state.currentFinanceEditId || `fin-local-${crypto.randomUUID()}`;
       const existingIx = state.financeRows.findIndex(r => r.id === id);
       const record = {
@@ -763,9 +894,18 @@
         paidDate: $('fPaidDate').value || '',
         source: 'local'
       };
-      if (existingIx >= 0) state.financeRows[existingIx] = record;
-      else state.financeRows.unshift(record);
-      localStorage.setItem(STORAGE.excel, JSON.stringify(state.financeRows));
+      if (state.finanzasDb) {
+        record.source = 'firebase-finanzas';
+        const remoteIx = state.financeFirebaseRows.findIndex(r => r.id === id);
+        if (remoteIx >= 0) state.financeFirebaseRows[remoteIx] = record;
+        else state.financeFirebaseRows.unshift(record);
+        await saveFinanceRowToFirebase(record);
+      } else {
+        if (existingIx >= 0) state.excelRows[existingIx] = record;
+        else state.excelRows.unshift(record);
+      }
+      recomputeFinanceRows();
+      localStorage.setItem(STORAGE.excel, JSON.stringify(state.excelRows));
       $('excelPill').textContent = `Excel listo · ${state.financeRows.length} filas`;
       $('excelPill').className = 'pill ok';
       populateFinanceCategorySelect(record.category);
@@ -774,11 +914,16 @@
       if (state.currentFinanceType) openFinanceModal(state.currentFinanceType);
     }
 
-    function deleteFinanceRecord(){
+    async function deleteFinanceRecord(){
       const id = state.currentFinanceEditId;
       if (!id) return;
-      state.financeRows = state.financeRows.filter(r => r.id !== id);
-      localStorage.setItem(STORAGE.excel, JSON.stringify(state.financeRows));
+      state.excelRows = state.excelRows.filter(r => r.id !== id);
+      state.financeFirebaseRows = state.financeFirebaseRows.filter(r => r.id !== id);
+      if (state.finanzasDb) {
+        try { await deleteFinanceRowFromFirebase(id); } catch (error) { console.warn('No se pudo borrar en Firebase financiero', error); }
+      }
+      recomputeFinanceRows();
+      localStorage.setItem(STORAGE.excel, JSON.stringify(state.excelRows));
       closeFinanceEditModal();
       renderAll();
       if (state.currentFinanceType) openFinanceModal(state.currentFinanceType);
