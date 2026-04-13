@@ -159,7 +159,8 @@
         </div>
       </div>
       <div class="actions">
-        <label class="btn blue" for="excelInput">Actualizar base desde Excel (opcional)</label>
+        <button id="openSheetModalBtn" class="btn blue">Enlazar Google Sheet</button>
+        <label class="btn white" for="excelInput" style="cursor:pointer">Subir Excel local</label>
         <button id="syncFirebaseBtn" class="btn green">Vincular Firebase</button>
         <button id="exportSeguimientoBtn" class="btn white">Exportar seguimiento CSV</button>
         <button id="exportFinBtn" class="btn white">Exportar finanzas CSV</button>
@@ -395,7 +396,7 @@
         <div class="field full"><label>Observaciones</label><textarea id="fObservations" rows="4"></textarea></div>
       </div>
       <div class="statusRow" style="justify-content:flex-end;margin-top:18px">
-        <button id="deleteFinanceRecordBtn" class="btn white">Eliminar local</button>
+        <button id="deleteFinanceRecordBtn" class="btn white">Ocultar del tablero</button>
         <button id="saveFinanceRecordBtn" class="btn blue">Guardar registro</button>
       </div>
     </div>
@@ -404,7 +405,7 @@
   <div id="modal" class="modal">
     <div class="modalCard">
       <div class="groupHead">
-        <h3>Editar registro de seguimiento</h3>
+        <h3>Editar o descartar caso del seguimiento</h3>
         <button id="closeModalBtn" class="btn white mini">Cerrar</button>
       </div>
       <div class="modalGrid">
@@ -422,8 +423,9 @@
         <div class="field"><label>Fecha</label><input id="mDate" type="date"></div>
         <div class="field full"><label>Observaciones</label><textarea id="mNotes" rows="4" placeholder="Notas del seguimiento, pago, coordinación, muestra o adeudo"></textarea></div>
       </div>
+      <div class="footerNote">Si el caso fue creado manualmente, se elimina. Si viene desde Firebase o cotizaciones, se oculta del seguimiento de forma persistente y no debería reaparecer al recargar.</div>
       <div class="statusRow" style="justify-content:flex-end;margin-top:18px">
-        <button id="deleteRecordBtn" class="btn white">Eliminar local</button>
+        <button id="deleteRecordBtn" class="btn white">Descartar del seguimiento</button>
         <button id="saveRecordBtn" class="btn blue">Guardar cambios</button>
       </div>
     </div>
@@ -435,7 +437,7 @@
       <div class="groupHead">
         <div>
           <h3>Cotizaciones y seguimiento</h3>
-          <div id="cotizacionesModalSubtitle" class="tiny">Vista interna de las cotizaciones enlazadas desde Firebase y registros manuales.</div>
+          <div id="cotizacionesModalSubtitle" class="tiny">Vista interna de las cotizaciones enlazadas desde Firebase y registros manuales. Los casos descartados no se muestran en este listado.</div>
         </div>
         <div class="rowActions">
           <button id="goSeguimientoBtn" class="btn blue mini">Ir al tablero</button>
@@ -452,6 +454,33 @@
       </div>
     </div>
   </div>
+
+
+  <div id="sheetModal" class="modal">
+    <div class="modalCard">
+      <div class="groupHead">
+        <h3>Enlazar Google Sheet</h3>
+        <button id="closeSheetModalBtn" class="btn white mini">Cerrar</button>
+      </div>
+      <p>Pega aquí el enlace de tu Google Sheet publicado como <strong>CSV</strong> o <strong>Excel</strong> para que la base se actualice sola cada vez que abras el reporte.</p>
+      <div class="field">
+        <label>URL de Google Sheet (Publicado en la web)</label>
+        <input id="googleSheetUrlInput" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv">
+      </div>
+      <div class="directHelp" style="margin-top:14px">
+        <strong>Instrucciones:</strong><br>
+        1. En tu Google Sheet, ve a <em>Archivo > Compartir > Publicar en la web</em>.<br>
+        2. Selecciona "Todo el documento" (o la hoja específica) y elige formato <strong>Valores separados por comas (.csv)</strong> o <strong>Microsoft Excel (.xlsx)</strong>.<br>
+        3. Haz clic en Publicar y pega el enlace aquí.<br>
+        4. Haz clic en "Guardar y Sincronizar".
+      </div>
+      <div class="statusRow" style="justify-content:flex-end;margin-top:18px">
+        <button id="testSheetBtn" class="btn white">Probar enlace</button>
+        <button id="saveSheetBtn" class="btn blue">Guardar y Sincronizar</button>
+      </div>
+    </div>
+  </div>
+
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
@@ -500,7 +529,7 @@
       manualTracking: loadJSON(STORAGE.tracking, {}),
       charts: {},
       balances: loadJSON(STORAGE.balances, { dailyCLP: 0, creditCLP: 0, usd: 0, updatedAt: '' }),
-      settings: loadJSON(STORAGE.settings, { cotizacionesUrl: 'dashboard.html' }),
+      settings: loadJSON(STORAGE.settings, { cotizacionesUrl: 'dashboard.html', googleSheetUrl: '' }),
       currentEditId: null,
       currentFinanceType: null,
       currentFinanceEditId: null,
@@ -548,6 +577,14 @@
     $('openDeudaProvBtn').addEventListener('click', () => openFinanceModal('proveedores'));
     $('openDeudaFinBtn').addEventListener('click', () => openFinanceModal('financiera'));
     $('openNominaBtn').addEventListener('click', () => openFinanceModal('nomina'));
+
+    $('openSheetModalBtn').addEventListener('click', () => {
+      $('googleSheetUrlInput').value = state.settings.googleSheetUrl || '';
+      $('sheetModal').classList.add('open');
+    });
+    $('closeSheetModalBtn').addEventListener('click', () => $('sheetModal').classList.remove('open'));
+    $('saveSheetBtn').addEventListener('click', saveGoogleSheetConfig);
+    $('testSheetBtn').addEventListener('click', () => syncGoogleSheet(true));
     ['searchInput','providerFilter','statusFilter','paymentFilter','groupByFilter'].forEach(id => $(id).addEventListener('input', renderAll));
 
     restoreExcel();
@@ -565,6 +602,74 @@
     }
     renderAll();
     syncFirebase();
+    if (state.settings.googleSheetUrl) syncGoogleSheet();
+
+    async function saveGoogleSheetConfig() {
+      const url = $('googleSheetUrlInput').value.trim();
+      state.settings.googleSheetUrl = url;
+      localStorage.setItem(STORAGE.settings, JSON.stringify(state.settings));
+      if (url) {
+        await syncGoogleSheet(true);
+      } else {
+        $('sheetModal').classList.remove('open');
+        renderAll();
+      }
+    }
+
+    async function syncGoogleSheet(isManual = false) {
+      const url = state.settings.googleSheetUrl;
+      if (!url) return;
+      
+      if (isManual) {
+        $('saveSheetBtn').textContent = 'Sincronizando...';
+        $('saveSheetBtn').disabled = true;
+      }
+      
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('No se pudo acceder a la URL');
+        
+        const blob = await response.blob();
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          try {
+            const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+            
+            if (rows.length > 0) {
+              state.excelRows = rows.map((row, idx) => normalizeFinanceRow(row, idx));
+              recomputeFinanceRows();
+              localStorage.setItem(STORAGE.excel, JSON.stringify(state.excelRows));
+              
+              $('excelPill').textContent = `Google Sheet enlazado · ${state.financeRows.length} filas`;
+              $('excelPill').className = 'pill ok';
+              
+              if (isManual) {
+                alert(`¡Sincronización exitosa! Se cargaron ${rows.length} filas.`);
+                $('sheetModal').classList.remove('open');
+              }
+              renderAll();
+            }
+          } catch (err) {
+            console.error('Error procesando el archivo de Google Sheets', err);
+            if (isManual) alert('Error al procesar los datos del Sheet. Asegúrate de que esté publicado como CSV o Excel.');
+          }
+        };
+        
+        reader.readAsArrayBuffer(blob);
+        
+      } catch (error) {
+        console.error('Error sincronizando Google Sheet:', error);
+        if (isManual) alert('Error de conexión: No se pudo descargar el archivo. Verifica que el enlace sea el de "Publicar en la Web" y tenga formato CSV o Excel.');
+      } finally {
+        if (isManual) {
+          $('saveSheetBtn').textContent = 'Guardar y Sincronizar';
+          $('saveSheetBtn').disabled = false;
+        }
+      }
+    }
 
     function recomputeFinanceRows(){
       const map = new Map();
@@ -1416,7 +1521,14 @@ function openModal(row){
     function deleteCurrentLocal(){
       const id = state.currentEditId;
       if (!id) return;
-      if (state.manualTracking[id]) delete state.manualTracking[id];
+      const row = buildTrackingRows().find(r => r.id === id);
+      if (!row) return;
+      if (row.source === 'manual') {
+        delete state.manualTracking[id];
+      } else {
+        const existing = state.manualTracking[id] || { id, source:'firebase' };
+        state.manualTracking[id] = { ...existing, hidden: true, hiddenAt: new Date().toISOString() };
+      }
       localStorage.setItem(STORAGE.tracking, JSON.stringify(state.manualTracking));
       closeModal();
       renderAll();
@@ -1447,108 +1559,120 @@ function openCotizacionesModal(){
 function closeCotizacionesModal(){ $('cotizacionesModal').classList.remove('open'); }
 
 async function exportExecutivePdf(){
+  const btn = $('exportPdfBtn');
+  const originalText = btn.textContent;
+  
   const { jsPDF } = window.jspdf || {};
-  if (!jsPDF || !window.html2canvas){
-    alert('No se pudo preparar la descarga del PDF en este momento.');
+  const jsPDFClass = jsPDF || window.jsPDF;
+  
+  if (!jsPDFClass || !window.html2canvas){
+    alert('No se pudieron cargar las librerías necesarias (jsPDF/html2canvas). Por favor, revisa tu conexión a internet.');
     return;
   }
 
-  const rows = buildTrackingRows();
-  const paidRows = rows.filter(r => isEnteredMoney(r.paymentStatus));
-  const visibleRows = rows.filter(r => Number(r.amountIn || 0) > 0);
-  const totalEntered = sum(paidRows.map(r => r.amountIn));
-  const totalVisible = sum(visibleRows.map(r => r.amountIn));
-  const pendingVisible = Math.max(0, totalVisible - totalEntered);
+  btn.textContent = 'Generando PDF...';
+  btn.disabled = true;
 
-  const providerMix = aggregate(rows, 'provider', 'amountIn', 20);
-  const conceptMix = aggregate(paidRows.length ? paidRows : visibleRows, 'test', 'amountIn', 20);
+  try {
+    const rows = buildTrackingRows();
+    const paidRows = rows.filter(r => isEnteredMoney(r.paymentStatus));
+    const visibleRows = rows.filter(r => Number(r.amountIn || 0) > 0);
+    const totalEntered = sum(paidRows.map(r => r.amountIn));
+    const totalVisible = sum(visibleRows.map(r => r.amountIn));
+    const pendingVisible = Math.max(0, totalVisible - totalEntered);
 
-  const byProviderCount = new Map();
-  rows.forEach(r => byProviderCount.set(r.provider || 'Sin dato', (byProviderCount.get(r.provider || 'Sin dato') || 0) + 1));
-  const conceptCounts = new Map();
-  rows.forEach(r => conceptCounts.set(r.test || 'Sin dato', (conceptCounts.get(r.test || 'Sin dato') || 0) + 1));
+    const providerMix = aggregate(rows, 'provider', 'amountIn', 20);
+    const conceptMix = aggregate(paidRows.length ? paidRows : visibleRows, 'test', 'amountIn', 20);
 
-  const stageRows = rows.map(r => ({...r, stage: mapStage(r.status)}));
-  const stageLabels = ['Cotización', 'Muestra', 'Laboratorio', 'Pago'];
-  const stageCounts = Object.fromEntries(stageLabels.map(s => [s, 0]));
-  stageRows.forEach(r => stageCounts[r.stage] = (stageCounts[r.stage] || 0) + 1);
-  const stalledRows = stageRows.filter(r => r.stage !== 'Pago').sort((a,b)=>Number(b.amountIn||0)-Number(a.amountIn||0)).slice(0,8);
+    const byProviderCount = new Map();
+    rows.forEach(r => byProviderCount.set(r.provider || 'Sin dato', (byProviderCount.get(r.provider || 'Sin dato') || 0) + 1));
+    const conceptCounts = new Map();
+    rows.forEach(r => conceptCounts.set(r.test || 'Sin dato', (conceptCounts.get(r.test || 'Sin dato') || 0) + 1));
 
-  const financeRows = state.financeRows || [];
-  const pendingFinance = financeRows.filter(r => !isPaid(r.paidStatus));
-  const provDebt = pendingFinance.filter(r => !isFinancialDebt(r) && !isNomina(r));
-  const finDebt = pendingFinance.filter(r => isFinancialDebt(r));
-  const payrollRows = pendingFinance.filter(r => isNomina(r));
-  const fixedRows = pendingFinance.filter(r => isFixedCost(r) && !isNomina(r));
-  const variableRows = pendingFinance.filter(r => isVariableCost(r));
+    const stageRows = rows.map(r => ({...r, stage: mapStage(r.status)}));
+    const stageLabels = ['Cotización', 'Muestra', 'Laboratorio', 'Pago'];
+    const stageCounts = Object.fromEntries(stageLabels.map(s => [s, 0]));
+    stageRows.forEach(r => stageCounts[r.stage] = (stageCounts[r.stage] || 0) + 1);
+    const stalledRows = stageRows.filter(r => r.stage !== 'Pago').sort((a,b)=>Number(b.amountIn||0)-Number(a.amountIn||0)).slice(0,8);
 
-  const debtByProvider = aggregateGeneric(provDebt, r => r.provider || r.concept || 'Sin proveedor', r => r.amount, 10);
-  const finByConcept = aggregateGeneric(finDebt, r => r.concept || r.provider || 'Sin dato', r => r.amount, 10);
-  const upcomingFinance = finDebt.filter(r => r.dueDate).sort((a,b)=> String(a.dueDate).localeCompare(String(b.dueDate))).slice(0,6);
-  const overdueProv = provDebt.filter(r => r.dueDate && r.dueDate < todayStr());
-  const overdueFin = finDebt.filter(r => r.dueDate && r.dueDate < todayStr());
+    const financeRows = state.financeRows || [];
+    const pendingFinance = financeRows.filter(r => !isPaid(r.paidStatus));
+    const provDebt = pendingFinance.filter(r => !isFinancialDebt(r) && !isNomina(r));
+    const finDebt = pendingFinance.filter(r => isFinancialDebt(r));
+    const payrollRows = pendingFinance.filter(r => isNomina(r));
+    const fixedRows = pendingFinance.filter(r => isFixedCost(r) && !isNomina(r));
+    const variableRows = pendingFinance.filter(r => isVariableCost(r));
 
-  const totalProvDebt = sum(provDebt.map(r => r.amount));
-  const totalFinDebt = sum(finDebt.map(r => r.amount));
-  const totalPayroll = sum(payrollRows.map(r => r.amount));
-  const totalFixed = sum(fixedRows.map(r => r.amount));
-  const totalVariable = sum(variableRows.map(r => r.amount));
-  const totalCosts = totalPayroll + totalFixed + totalVariable;
-  const balance = totalEntered - (totalProvDebt + totalFinDebt + totalCosts);
+    const debtByProvider = aggregateGeneric(provDebt, r => r.provider || r.concept || 'Sin proveedor', r => r.amount, 10);
+    const finByConcept = aggregateGeneric(finDebt, r => r.concept || r.provider || 'Sin dato', r => r.amount, 10);
+    const upcomingFinance = finDebt.filter(r => r.dueDate).sort((a,b)=> String(a.dueDate).localeCompare(String(b.dueDate))).slice(0,6);
+    const overdueProv = provDebt.filter(r => r.dueDate && r.dueDate < todayStr());
+    const overdueFin = finDebt.filter(r => r.dueDate && r.dueDate < todayStr());
 
-  const topConcept = conceptMix.labels[0] ? `${conceptMix.labels[0]} (${fmtMoney(conceptMix.values[0])})` : 'Sin dato';
-  const topProvider = providerMix.labels[0] ? `${providerMix.labels[0]} (${fmtMoney(providerMix.values[0])})` : 'Sin dato';
-  const bottleneckStage = stageLabels.slice(0,3).sort((a,b)=>stageCounts[b]-stageCounts[a])[0] || 'Cotización';
-  const dayRecommendations = (document.getElementById('dailyRecommendations')?.value || '').trim();
+    const totalProvDebt = sum(provDebt.map(r => r.amount));
+    const totalFinDebt = sum(finDebt.map(r => r.amount));
+    const totalPayroll = sum(payrollRows.map(r => r.amount));
+    const totalFixed = sum(fixedRows.map(r => r.amount));
+    const totalVariable = sum(variableRows.map(r => r.amount));
+    const totalCosts = totalPayroll + totalFixed + totalVariable;
+    const balance = totalEntered - (totalProvDebt + totalFinDebt + totalCosts);
 
-  const temp = document.createElement('div');
-  temp.style.position = 'fixed';
-  temp.style.left = '-10000px';
-  temp.style.top = '0';
-  temp.style.width = '1120px';
-  temp.style.background = '#f4f7fb';
-  temp.style.padding = '24px';
-  temp.style.fontFamily = 'Inter, Arial, sans-serif';
+    const topConcept = conceptMix.labels[0] ? `${conceptMix.labels[0]} (${fmtMoney(conceptMix.values[0])})` : 'Sin dato';
+    const topProvider = providerMix.labels[0] ? `${providerMix.labels[0]} (${fmtMoney(providerMix.values[0])})` : 'Sin dato';
+    const bottleneckStage = stageLabels.slice(0,3).sort((a,b)=>stageCounts[b]-stageCounts[a])[0] || 'Cotización';
+    const dayRecommendations = (document.getElementById('dailyRecommendations')?.value || '').trim();
 
-  const pageShell = (bodyHtml, includeHeader = false) => `
-    <div class="pdf-page" style="width:1120px;background:#fff;border:1px solid #d9e3ef;border-radius:24px;padding:24px;box-shadow:0 14px 40px rgba(23,74,151,.08);margin-bottom:22px;box-sizing:border-box;overflow:hidden">
-      ${includeHeader ? `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:18px">
-        <div style="display:flex;gap:14px;align-items:center">
-          <img src="assets/logo-nomad.png" style="width:72px;height:72px;object-fit:contain;border:1px solid #d9e3ef;border-radius:16px;padding:10px;background:#fff">
-          <div>
-            <div style="font-size:32px;font-weight:800;color:#0f2747;line-height:1.05">Reporte diario ejecutivo</div>
-            <div style="font-size:15px;color:#607796;margin-top:6px">Estructura rubro por rubro para toma de decisiones · ${new Date().toLocaleDateString('es-CL')}</div>
+    const temp = document.createElement('div');
+    temp.style.position = 'fixed';
+    temp.style.left = '0';
+    temp.style.top = '0';
+    temp.style.width = '1120px';
+    temp.style.zIndex = '-1000';
+    temp.style.opacity = '0';
+    temp.style.pointerEvents = 'none';
+    temp.style.background = '#f4f7fb';
+    temp.style.padding = '24px';
+    temp.style.fontFamily = 'Inter, Arial, sans-serif';
+
+    const pageShell = (bodyHtml, includeHeader = false) => `
+      <div class="pdf-page" style="width:1120px;background:#fff;border:1px solid #d9e3ef;border-radius:24px;padding:24px;box-shadow:0 14px 40px rgba(23,74,151,.08);margin-bottom:22px;box-sizing:border-box;overflow:hidden">
+        ${includeHeader ? `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:18px">
+          <div style="display:flex;gap:14px;align-items:center">
+            <div style="width:72px;height:72px;border:1px solid #d9e3ef;border-radius:16px;background:#0f2747;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;letter-spacing:1px">NOMAD</div>
+            <div>
+              <div style="font-size:32px;font-weight:800;color:#0f2747;line-height:1.05">Reporte diario ejecutivo</div>
+              <div style="font-size:15px;color:#607796;margin-top:6px">Estructura rubro por rubro para toma de decisiones · ${new Date().toLocaleDateString('es-CL')}</div>
+            </div>
           </div>
+          <div style="font-size:13px;color:#607796;text-align:right;line-height:1.5">Nomad Genetics<br>Resumen para Guillermo</div>
         </div>
-        <div style="font-size:13px;color:#607796;text-align:right;line-height:1.5">Nomad Genetics<br>Resumen para Guillermo</div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+          ${metricCard('Dinero entró a cuenta corriente', fmtMoney(totalEntered), `${paidRows.length} registros con pago / parcial / abono / convenio`, '#f6fffa')}
+          ${metricCard('Pendiente visible por cobrar', fmtMoney(pendingVisible), `${Math.max(visibleRows.length - paidRows.length, 0)} registros aún no marcados como entrada real`, '#fffdfa')}
+          ${metricCard('Deudas totales', fmtMoney(totalProvDebt + totalFinDebt), `${provDebt.length} de proveedor · ${finDebt.length} financieras`, '#fff7f7')}
+          ${metricCard('Costos operativos', fmtMoney(totalCosts), `Nómina ${fmtMoney(totalPayroll)} · Fijos ${fmtMoney(totalFixed)} · Variables ${fmtMoney(totalVariable)}`, '#f8f8ff')}
+        </div>` : ''}
+        ${bodyHtml}
+      </div>`;
+
+    const pageOne = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        ${sectionBlock('1. Cuánto dinero entró a la cuenta corriente', `
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+            ${miniMetric('Entrada real', fmtMoney(totalEntered))}
+            ${miniMetric('Monto visible', fmtMoney(totalVisible))}
+            ${miniMetric('Balance operativo', fmtMoney(balance))}
+          </div>
+          <div style="margin-top:8px;color:#526a8c;line-height:1.55;font-size:13px">Se consideran como entrada real los registros marcados con <strong>PAGO TOTAL</strong>, <strong>PAGO PARCIAL</strong>, <strong>ABONO</strong> o <strong>CONVENIO</strong>. El resto permanece como visible en seguimiento para diferenciar lo cobrado de lo pendiente.</div>
+        `)}
+        ${sectionBlock('2. Por qué concepto entra ese dinero', renderRankTable(conceptMix.labels.slice(0,8).map((label, i) => ({
+          label,
+          amount: conceptMix.values[i],
+          extra: `${conceptCounts.get(label) || 0} expedientes · ${percent(conceptMix.values[i], sum(conceptMix.values))}`
+        })), ['Concepto','Monto','Detalle']))}
       </div>
-
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-        ${metricCard('Dinero entró a cuenta corriente', fmtMoney(totalEntered), `${paidRows.length} registros con pago / parcial / abono / convenio`, '#f6fffa')}
-        ${metricCard('Pendiente visible por cobrar', fmtMoney(pendingVisible), `${Math.max(visibleRows.length - paidRows.length, 0)} registros aún no marcados como entrada real`, '#fffdfa')}
-        ${metricCard('Deudas totales', fmtMoney(totalProvDebt + totalFinDebt), `${provDebt.length} de proveedor · ${finDebt.length} financieras`, '#fff7f7')}
-        ${metricCard('Costos operativos', fmtMoney(totalCosts), `Nómina ${fmtMoney(totalPayroll)} · Fijos ${fmtMoney(totalFixed)} · Variables ${fmtMoney(totalVariable)}`, '#f8f8ff')}
-      </div>` : ''}
-      ${bodyHtml}
-    </div>`;
-
-  const pageOne = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      ${sectionBlock('1. Cuánto dinero entró a la cuenta corriente', `
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
-          ${miniMetric('Entrada real', fmtMoney(totalEntered))}
-          ${miniMetric('Monto visible', fmtMoney(totalVisible))}
-          ${miniMetric('Balance operativo', fmtMoney(balance))}
-        </div>
-        <div style="margin-top:8px;color:#526a8c;line-height:1.55;font-size:13px">Se consideran como entrada real los registros marcados con <strong>PAGO TOTAL</strong>, <strong>PAGO PARCIAL</strong>, <strong>ABONO</strong> o <strong>CONVENIO</strong>. El resto permanece como visible en seguimiento para diferenciar lo cobrado de lo pendiente.</div>
-      `)}
-      ${sectionBlock('2. Por qué concepto entra ese dinero', renderRankTable(conceptMix.labels.slice(0,8).map((label, i) => ({
-        label,
-        amount: conceptMix.values[i],
-        extra: `${conceptCounts.get(label) || 0} expedientes · ${percent(conceptMix.values[i], sum(conceptMix.values))}`
-      })), ['Concepto','Monto','Detalle']))}
-    </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       ${sectionBlock('3. Distribución de ventas', renderRankTable(providerMix.labels.slice(0,8).map((label, i) => ({
@@ -1632,40 +1756,77 @@ async function exportExecutivePdf(){
     `)}
   `;
 
-  temp.innerHTML = pageShell(pageOne, true) + pageShell(pageTwo, false);
-  document.body.appendChild(temp);
-  try {
+    temp.innerHTML = pageShell(pageOne, true) + pageShell(pageTwo, false);
+    document.body.appendChild(temp);
+    
+    // Pequeño delay para asegurar que el navegador haya renderizado el div temporal
+    await new Promise(r => setTimeout(r, 500));
+    
     const pages = temp.querySelectorAll('.pdf-page');
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdf = new jsPDFClass('p', 'mm', 'a4');
     const pdfW = pdf.internal.pageSize.getWidth();
-    const pdfH = pdf.internal.pageSize.getHeight();
     const margin = 6;
     const imgW = pdfW - margin * 2;
 
     for (let i = 0; i < pages.length; i++) {
-      const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#f4f7fb', useCORS: true });
-      const img = canvas.toDataURL('image/png');
-      const imgH = canvas.height * imgW / canvas.width;
-      if (i > 0) pdf.addPage();
-      pdf.addImage(img, 'PNG', margin, margin, imgW, imgH, '', 'FAST');
+      try {
+        const canvas = await html2canvas(pages[i], { 
+          scale: 1.5, // Bajamos un poco la escala para ahorrar memoria
+          backgroundColor: '#f4f7fb', 
+          useCORS: false, // En local file:// no ayuda
+          logging: false
+        });
+        const img = canvas.toDataURL('image/png');
+        const imgH = canvas.height * imgW / canvas.width;
+        if (i > 0) pdf.addPage();
+        pdf.addImage(img, 'PNG', margin, margin, imgW, imgH, undefined, 'FAST');
+      } catch (pageErr) {
+        console.warn(`Error en página ${i+1}:`, pageErr);
+        // Si una página falla, intentamos continuar con la siguiente
+      }
     }
-    pdf.save('nomad_reporte_diario_ejecutivo_rubro_por_rubro.pdf');
-  } finally {
+    pdf.save('nomad_reporte_diario.pdf');
     temp.remove();
+  } catch (err) {
+    console.error('Error general generando el PDF:', err);
+    alert('Error técnico: ' + err.message + '\n\nEsto suele pasar si el navegador bloquea el acceso a las imágenes locales. Intenta usar un navegador como Edge o Chrome actualizado.');
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
   }
 }
 
 
     function exportSeguimientoCsv(){
       const rows = buildTrackingRows().map(r => ({
-        nombre:r.name, folio:r.folio, proveedor:r.provider, tipo_prueba:r.test, estado:r.status,
-        estado_pago:r.paymentStatus, monto:r.amountIn, fecha:r.date, notas:r.notes
+        'Paciente / Nombre': r.name,
+        'Folio': r.folio,
+        'Proveedor': r.provider,
+        'Tipo de Prueba': r.test,
+        'Estado Operativo': r.status,
+        'Estado de Pago': r.paymentStatus,
+        'Monto Acordado': r.amountIn,
+        'Fecha': r.date,
+        'Observaciones / Notas': r.notes
       }));
-      downloadCsv(rows, 'nomad_seguimiento_ejecutivo.csv');
+      downloadExcel(rows, 'nomad_seguimiento_ejecutivo.xlsx');
     }
 
     function exportFinanzasCsv(){
-      downloadCsv(state.financeRows, 'nomad_finanzas_ejecutivas.csv');
+      const rows = state.financeRows.map(r => ({
+        'Categoría': r.category,
+        'Concepto': r.concept,
+        'Proveedor': r.provider,
+        'Descripción': r.description,
+        'Referencia': r.ref,
+        'Monto': r.amount,
+        'Documento': r.document,
+        'Vencimiento': r.dueDate,
+        'Estado Pago': r.paidStatus,
+        'Fecha Pago': r.paidDate,
+        'Observaciones': r.observations
+      }));
+      downloadExcel(rows, 'nomad_finanzas_ejecutivas.xlsx');
     }
 
     function clearFilters(){
@@ -1712,10 +1873,7 @@ async function exportExecutivePdf(){
       return lines.slice(0,3);
     }
     function compactMoney(value){
-      const n = Number(value || 0);
-      if (Math.abs(n) >= 1000000) return `${(n/1000000).toFixed(1)} MM`;
-      if (Math.abs(n) >= 1000) return `${(n/1000).toFixed(0)} mil`;
-      return String(n);
+      return fmtMoney(value || 0);
     }
 
 
@@ -1817,15 +1975,91 @@ async function exportExecutivePdf(){
       return 'gray';
     }
     function escapeHtml(s){ return String(s ?? '').replace(/[&<>\"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
-    function downloadCsv(rows, filename){
-      const data = Array.isArray(rows) ? rows : [];
-      if (!data.length) return;
+    function downloadExcel(data, filename) {
+      if (!Array.isArray(data) || !data.length) return;
+      
       const headers = Object.keys(data[0]);
-      const csv = [headers.join(','), ...data.map(row => headers.map(h => JSON.stringify(row[h] ?? '')).join(','))].join('\n');
-      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      
+      // Construimos una tabla HTML con estilos que Excel reconoce al abrir
+      let html = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <!--[if gte mso 9]>
+          <xml>
+            <x:ExcelWorkbook>
+              <x:ExcelWorksheets>
+                <x:ExcelWorksheet>
+                  <x:Name>Reporte Nomad</x:Name>
+                  <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+                </x:ExcelWorksheet>
+              </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+          </xml>
+          <![endif]-->
+          <style>
+            table { border-collapse: collapse; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+            th { 
+              background-color: #0F2747; 
+              color: #FFFFFF; 
+              font-weight: bold; 
+              border: 1.5pt solid #000000; 
+              padding: 10px; 
+              text-align: center;
+              font-size: 11pt;
+            }
+            td { 
+              border: 0.5pt solid #CBD5E0; 
+              padding: 8px; 
+              font-size: 10pt;
+              color: #2D3748;
+              mso-number-format: "\\@"; /* Fuerza formato texto por defecto */
+            }
+            .money { 
+              text-align: right; 
+              mso-number-format: "\\$#,##0"; 
+            }
+            .header-info {
+              font-size: 14pt;
+              font-weight: bold;
+              color: #0F2747;
+              margin-bottom: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-info">REPORTE NOMAD - ${new Date().toLocaleDateString('es-CL')}</div>
+          <table>
+            <thead>
+              <tr>
+                ${headers.map(h => `<th>${h}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(row => `
+                <tr>
+                  ${headers.map(h => {
+                    const val = row[h] ?? '';
+                    const isMoney = String(h).toLowerCase().includes('monto');
+                    return `<td class="${isMoney ? 'money' : ''}">${val}</td>`;
+                  }).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = filename; a.click();
+      a.href = url;
+      // Usamos .xls porque es el formato que mejor procesa este truco de HTML
+      a.download = filename.replace('.xlsx', '.xls');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
   </script>
